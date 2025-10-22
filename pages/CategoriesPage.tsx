@@ -24,7 +24,11 @@ const CategoriesPage: React.FC = () => {
     useEffect(() => {
         const load = async () => {
             if (USE_API) {
-                try { setCategories(await apiCategories.fetchCategories()); }
+                try {
+                    const res = await apiCategories.fetchCategories();
+                    const arr = Array.isArray(res) ? res : (Array.isArray((res as any)?.data) ? (res as any).data : []);
+                    setCategories(arr as any);
+                }
                 catch (e) { console.error('API categories failed, fallback to mock', e); setCategories(apiFetchCategories()); }
             } else {
                 setCategories(apiFetchCategories());
@@ -65,12 +69,9 @@ const CategoriesPage: React.FC = () => {
     };
     
     const filteredCategories = useMemo(() => {
-        if (!searchTerm) {
-            return categories;
-        }
-        return categories.filter(category =>
-            category.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        const list = Array.isArray(categories) ? categories : [];
+        if (!searchTerm) return list;
+        return list.filter(category => category.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [categories, searchTerm]);
     
     // Reset page number when search term changes

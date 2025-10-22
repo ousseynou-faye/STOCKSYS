@@ -22,7 +22,11 @@ const StoresPage: React.FC = () => {
     useEffect(() => {
         const load = async () => {
             if (USE_API) {
-                try { setStores(await apiStores.fetchStores()); }
+                try {
+                    const res = await apiStores.fetchStores();
+                    const arr = Array.isArray(res) ? res : (Array.isArray((res as any)?.data) ? (res as any).data : []);
+                    setStores(arr as any);
+                }
                 catch (e) { console.error('API stores failed, fallback to mock', e); setStores(apiFetchStores()); }
             } else {
                 setStores(apiFetchStores());
@@ -62,7 +66,7 @@ const StoresPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const exportableData = useMemo(() => stores.map(store => ({
+    const exportableData = useMemo(() => (Array.isArray(stores) ? stores : []).map(store => ({
         'ID': store.id,
         'Nom de la Boutique': store.name,
     })), [stores]);
@@ -91,7 +95,7 @@ const StoresPage: React.FC = () => {
             <Card>
                 <Table 
                     columns={columns} 
-                    data={stores}
+                    data={Array.isArray(stores) ? stores : []}
                     currentPage={currentPage}
                     itemsPerPage={ITEMS_PER_PAGE}
                     onPageChange={setCurrentPage}

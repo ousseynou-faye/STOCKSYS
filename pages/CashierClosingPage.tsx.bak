@@ -33,9 +33,7 @@ const CashierClosingPage: React.FC = () => {
     // Admin filter
     const [filterStoreId, setFilterStoreId] = useState('');
 
-    const isAdmin = useMemo(() => hasPermission(Permission.VIEW_STORES) || hasPermission(Permission.MANAGE_USERS), [hasPermission]);
-    const canViewStores = useMemo(() => hasPermission(Permission.VIEW_STORES), [hasPermission]);
-    const canViewUsers = useMemo(() => hasPermission(Permission.VIEW_USERS) || hasPermission(Permission.MANAGE_USERS), [hasPermission]);
+    const isAdmin = useMemo(() => hasPermission(Permission.MANAGE_CASHIER_SESSIONS), [hasPermission]);
 
     useEffect(() => {
         if (!user) return;
@@ -46,19 +44,14 @@ const CashierClosingPage: React.FC = () => {
             // Charger données de référence (boutiques/utilisateurs) pour libellés
             if (USE_API) {
                 try {
-                    // Ne charger les boutiques que si l'utilisateur peut les voir
-                    if (canViewStores) {
+                    if (isAdmin) {
                         const s = await apiStores.fetchStores();
                         setStores((Array.isArray(s) ? s : (s as any)?.data || []) as any);
                     } else {
                         setStores([]);
                     }
-                                        if (canViewUsers) {
-                        const us = await apiUsers.fetchUsers();
-                        setUsers((Array.isArray(us) ? us : (us as any)?.data || []) as any);
-                    } else {
-                        setUsers(user ? [{ id: (user as any).id, username: (user as any).username || 'Utilisateur' }] as any : []);
-                    }
+                    const us = await apiUsers.fetchUsers();
+                    setUsers((Array.isArray(us) ? us : (us as any)?.data || []) as any);
                 } catch {
                     setStores([]);
                     setUsers([]);
@@ -68,8 +61,8 @@ const CashierClosingPage: React.FC = () => {
                 setUsers(MOCK_USERS as any);
             }
 
-            // User with a store assigned: fetch their active session and store history
-            if (user.storeId) {
+            // Regular user: fetch their active session and store history
+            if (!isAdmin && user.storeId) {
                 const session = USE_API ? (await apiCashier.fetchActive(user.id, user.storeId) as any) : await apiFetchActiveCashierSession(user.id, user.storeId);
                 setActiveSession(session);
                 if (session) {
@@ -88,12 +81,15 @@ const CashierClosingPage: React.FC = () => {
                         setSalesInSession(sessionSales);
                     }
                 }
+            } else {
+                // Admin has no personal active session
+                setActiveSession(null);
             }
             
             // Fetch all history for admin, or just store-specific for others
             if (USE_API) {
                 try {
-                    const res = await apiCashier.fetchSessions({ page: historyPage, limit: 10, storeId: (canViewStores ? (isAdmin ? (filterStoreId || undefined) : user?.storeId) : user?.storeId) });
+                    const res = await apiCashier.fetchSessions({ page: historyPage, limit: 10, storeId: isAdmin ? (filterStoreId || undefined) : user?.storeId });
                     setSessionHistory((res as any)?.data || res);
                     setHistoryTotal(((res as any)?.meta?.total) || 0);
                 } catch (e: any) {
@@ -120,8 +116,7 @@ const CashierClosingPage: React.FC = () => {
     }, [user, refreshKey, isAdmin, historyPage, filterStoreId]);
 
     const filteredHistory = useMemo(() => {
-        // Ne charger les boutiques que si l'utilisateur peut les voir
-                    if (canViewStores) {
+        if (isAdmin) {
             return sessionHistory.filter(s => !filterStoreId || s.storeId === filterStoreId);
         }
         return sessionHistory.filter(s => s.storeId === user?.storeId);
@@ -192,7 +187,7 @@ const CashierClosingPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <h1 className="text-2xl font-bold">Clôture de Caisse</h1>
-                {user?.storeId && hasPermission(Permission.MANAGE_CASHIER_SESSIONS) && (
+                {!isAdmin && user?.storeId && (
                     !activeSession ? (
                         <Button onClick={() => setIsStartModalOpen(true)}>Démarrer la session</Button>
                     ) : (
@@ -228,14 +223,14 @@ const CashierClosingPage: React.FC = () => {
             <Card>
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
                     <h2 className="text-xl font-semibold">Historique des sessions</h2>
-                    {canViewStores && (
+                    {isAdmin && (
                         <div className="w-full sm:w-64">
                             <Select 
                                 label="Filtrer par boutique"
                                 id="store-filter"
                                 value={filterStoreId}
                                 onChange={(e) => setFilterStoreId(e.target.value)}
-                                options={[{ value: '', label: 'Toutes les boutiques'}, ...(((USE_API ? (Array.isArray(stores) ? stores : []) : MOCK_STORES) as any[]).map((s: any) => ({ value: s.id, label: s.name })))]}
+                                options={[{ value: '', label: 'Toutes les boutiques'}, ...((USE_API ? stores : MOCK_STORES) as any[]).map((s: any) => ({ value: s.id, label: s.name }))]}
                             />
                         </div>
                     )}
@@ -273,15 +268,5 @@ const CashierClosingPage: React.FC = () => {
 };
 
 export default CashierClosingPage;
-
-
-
-
-
-
-
-
-
-
 
 

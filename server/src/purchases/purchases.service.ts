@@ -23,11 +23,47 @@ export class PurchasesService {
     return { data, meta: { page, limit, total } };
   }
   async create(po: any) {
-    const { items, ...rest } = po || {};
-    const data: any = { ...rest };
-    if (Array.isArray(items)) {
-      data.items = { create: items.map((i: any) => ({ variationId: i.variationId, quantity: i.quantity, price: i.price, receivedQuantity: i.receivedQuantity ?? 0 })) };
+    if (!po || !po.supplierId || !po.storeId) {
+      throw new BadRequestException('Fournisseur et boutique sont requis');
     }
+    const supplier = await this.prisma.supplier.findUnique({ where: { id: po.supplierId } });
+    if (!supplier) throw new BadRequestException('Fournisseur introuvable');
+    const store = await this.prisma.store.findUnique({ where: { id: po.storeId } });
+    if (!store) throw new BadRequestException('Boutique introuvable');
+
+    const items = Array.isArray(po.items) ? po.items : [];
+    if (items.length === 0) throw new BadRequestException('Au moins un article est requis');
+
+    // Validate variations and sanitize values
+    const variationIds: string[] = Array.from(new Set((items as Array<{ variationId: any }> ).map(i => i.variationId).filter((v): v is string => typeof v === 'string' && v.length > 0)));
+    const variations = await this.prisma.productVariation.findMany({ where: { id: { in: variationIds } } });
+    const varSet = new Set(variations.map((v: any) => v.id));
+    for (const it of items) {
+      if (!it?.variationId || !varSet.has(it.variationId)) throw new BadRequestException(`Variation invalide: ${it?.variationId ?? ''}`);
+      const qty = Number(it.quantity);
+      const price = Number(it.price);
+      if (!Number.isFinite(qty) || qty <= 0) throw new BadRequestException('Quantité invalide');
+      if (!Number.isFinite(price) || price < 0) throw new BadRequestException('Prix invalide');
+    }
+
+    const totalAmount = items.reduce((s: number, it: any) => s + Number(it.quantity) * Number(it.price), 0);
+
+    const data: any = {
+      supplierId: po.supplierId,
+      storeId: po.storeId,
+      status: po.status || 'DRAFT',
+      createdById: po.createdById || undefined,
+      totalAmount,
+      items: {
+        create: items.map((i: any) => ({
+          variationId: i.variationId,
+          quantity: Number(i.quantity),
+          price: Number(i.price),
+          receivedQuantity: Number.isFinite(Number(i.receivedQuantity)) ? Number(i.receivedQuantity) : 0,
+        })),
+      },
+    };
+
     return this.prisma.purchaseOrder.create({ data });
   }
   async update(id: string, po: any) {
@@ -87,4 +123,5 @@ export class PurchasesService {
     });
   }
 }
+
 

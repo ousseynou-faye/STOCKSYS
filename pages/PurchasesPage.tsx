@@ -265,8 +265,14 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
     
     const handleSave = async () => {
         if (!user) return;
+        if (!poData.supplierId) { addToast({ message: 'Sélectionnez un fournisseur.', type: 'error' }); return; }
+        if (!poData.storeId) { addToast({ message: 'Sélectionnez une boutique.', type: 'error' }); return; }
         if (poData.items.length === 0) {
             addToast({ message: "Ajoutez au moins un produit.", type: 'error' });
+            return;
+        }
+        if (poData.items.some(it => !it.variationId || Number(it.quantity) <= 0 || Number(it.price) < 0)) {
+            addToast({ message: 'Vérifiez les articles: quantité > 0 et prix >= 0.', type: 'error' });
             return;
         }
         const poSanitized = {

@@ -68,8 +68,8 @@ export const Select: React.FC<SelectProps> = ({ label, id, options, className = 
             className={`w-full bg-background border border-secondary/70 rounded-md px-3 py-2 text-sm text-text-primary focus:ring-accent focus:border-accent ${className}`}
             {...props}
         >
-            {options.map(option => (
-                <option key={option.value} value={option.value}>
+            {options.map((option, idx) => (
+                <option key={`${option.value}-${idx}`} value={option.value}>
                     {option.label}
                 </option>
             ))}
@@ -123,8 +123,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, id, options, se
             </div>
             {isOpen && (
                 <div className="absolute z-10 w-full mt-1 bg-surface border border-secondary/70 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {options.map(option => (
-                        <label key={option.value} className="flex items-center space-x-2 p-2 hover:bg-secondary cursor-pointer">
+                    {options.map((option, idx) => (
+                        <label key={`${option.value}-${idx}`} className="flex items-center space-x-2 p-2 hover:bg-secondary cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={selectedValues.includes(option.value)}

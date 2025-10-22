@@ -35,7 +35,8 @@ const RolesPage: React.FC = () => {
             if (USE_API) {
                 try {
                     const rs = await apiRoles.fetchRoles();
-                    setRoles(rs);
+                    const rolesArray = Array.isArray(rs) ? (rs as any) : (Array.isArray((rs as any)?.data) ? (rs as any).data : []);
+                    setRoles(rolesArray as any);
                 } catch (e) {
                     console.error('API roles failed, fallback to mock', e);
                     setRoles(apiFetchRoles());
@@ -48,7 +49,8 @@ const RolesPage: React.FC = () => {
     }, [refreshKey]);
 
     const filteredRoles = useMemo(() => {
-        return roles.filter(role => role.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        const list = Array.isArray(roles) ? roles : [];
+        return list.filter(role => role.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [roles, searchTerm]);
 
     const handleCreateClick = () => {

@@ -41,8 +41,10 @@ const UsersPage: React.FC = () => {
                     arr = arr.map((usr: any) => ({...usr, roleIds: Array.isArray(usr.roleIds) ? usr.roleIds : (Array.isArray(usr.roles) ? usr.roles.map((rr: any) => rr.id) : []),}));
                     setUsers(arr as any);
                     setServerTotal(((u as any)?.meta?.total) || arr.length);
-                    setRoles(r);
-                    setStores((s as any) || []);
+                    const rolesArray = Array.isArray(r) ? (r as any) : (Array.isArray((r as any)?.data) ? (r as any).data : []);
+                    const storesArray = Array.isArray(s) ? (s as any) : (Array.isArray((s as any)?.data) ? (s as any).data : []);
+                    setRoles(rolesArray as any);
+                    setStores(storesArray as any);
                 } catch (e) {
                     console.error('API users/roles failed', e);
                     if (STRICT_API) {
@@ -77,8 +79,9 @@ const UsersPage: React.FC = () => {
 
     const dataWithDetails = useMemo(() => filteredUsers.map(user => {
         const roleIds = Array.isArray(user.roleIds) ? user.roleIds : [];
-        const userRoles = roles.filter(role => roleIds.includes(role.id));
-        const storesSource = USE_API ? stores : MOCK_STORES;
+        const roleList = Array.isArray(roles) ? roles : [];
+        const userRoles = roleList.filter(role => roleIds.includes(role.id));
+        const storesSource = USE_API ? (Array.isArray(stores) ? stores : []) : MOCK_STORES;
         return {
             ...user,
             storeName: user.storeId ? storesSource.find(s => s.id === user.storeId)?.name : 'N/A',
@@ -207,7 +210,7 @@ const UsersPage: React.FC = () => {
                     <MultiSelect
                         label="Rôles"
                         id="roles"
-                        options={roles.map(r => ({ value: r.id, label: r.name }))}
+                        options={(Array.isArray(roles) ? roles : []).map(r => ({ value: r.id, label: r.name }))}
                         selectedValues={selectedRoleIds}
                         onChange={setSelectedRoleIds}
                     />
@@ -216,7 +219,7 @@ const UsersPage: React.FC = () => {
                         id="store" 
                         name="store"
                         defaultValue={editingUser?.storeId || ''}
-                        options={[{ value: '', label: 'Aucune' }, ...(USE_API ? stores : MOCK_STORES).map(s => ({ value: s.id, label: s.name }))]} 
+                        options={[{ value: '', label: 'Aucune' }, ...((USE_API ? (Array.isArray(stores) ? stores : []) : MOCK_STORES).map(s => ({ value: s.id, label: s.name })))]} 
                     />
                     <div className="flex justify-end space-x-2 pt-4">
                         <Button type="button" variant="secondary" onClick={() => { setIsCreateModalOpen(false); setEditingUser(null); }}>Annuler</Button>

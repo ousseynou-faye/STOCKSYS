@@ -63,11 +63,13 @@ const InventoryPage: React.FC = () => {
                         apiStores.fetchStores(),
                         apiProducts.fetchProducts(),
                     ]);
+                    const sessArray = Array.isArray(sess) ? (sess as any) : (Array.isArray((sess as any)?.data) ? (sess as any).data : []);
+                    const stsArray = Array.isArray(sts) ? (sts as any) : (Array.isArray((sts as any)?.data) ? (sts as any).data : []);
                     const filtered = (user?.storeId && !hasPermission(Permission.MANAGE_ROLES))
-                        ? sess.filter((s: any) => s.storeId === user!.storeId)
-                        : sess;
+                        ? (sessArray as any[]).filter((s: any) => s.storeId === user!.storeId)
+                        : (sessArray as any[]);
                     setSessions(filtered as any);
-                    setStores(sts as any);
+                    setStores(stsArray as any);
                     const prodArray = Array.isArray(prods) ? (prods as any) : (((prods as any) && (prods as any).data) ? (prods as any).data : []);
                     setProducts(prodArray as any);
                 } else {
@@ -101,7 +103,8 @@ const InventoryPage: React.FC = () => {
     }, [refreshKey, user, hasPermission]);
 
     const filteredSessions = useMemo(() => {
-        return sessions.filter(s => 
+        const list = Array.isArray(sessions) ? sessions : [];
+        return list.filter(s => 
             (!filterStore || s.storeId === filterStore) &&
             (!filterStatus || s.status === filterStatus)
         );
@@ -239,7 +242,7 @@ const InventoryPage: React.FC = () => {
             </div>
             <Card>
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <Select label="Filtrer par boutique" id="filter-store" value={filterStore} onChange={e => setFilterStore(e.target.value)} options={[{ value: '', label: 'Toutes'}, ...stores.map(s => ({ value: s.id, label: s.name }))]} disabled={!!user?.storeId && !hasPermission(Permission.MANAGE_ROLES)}/>
+                    <Select label="Filtrer par boutique" id="filter-store" value={filterStore} onChange={e => setFilterStore(e.target.value)} options={[{ value: '', label: 'Toutes'}, ...((Array.isArray(stores) ? stores : []).map(s => ({ value: s.id, label: s.name })))]} disabled={!!user?.storeId && !hasPermission(Permission.MANAGE_ROLES)}/>
                     <Select label="Filtrer par statut" id="filter-status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} options={[{ value: '', label: 'Tous'}, ...Object.values(InventorySessionStatus).map(s => ({ value: s, label: s }))]} />
                     <Button variant="secondary" onClick={() => { setFilterStore(''); setFilterStatus(''); }}>Réinitialiser</Button>
                 </div>
@@ -263,8 +266,8 @@ const InventoryPage: React.FC = () => {
                         id="storeId"
                         name="storeId"
                         options={user?.storeId && !hasPermission(Permission.MANAGE_ROLES) ? 
-                            stores.filter(s => s.id === user.storeId).map(s => ({ value: s.id, label: s.name }))
-                            : stores.map(s => ({ value: s.id, label: s.name }))
+                            (Array.isArray(stores) ? stores : []).filter(s => s.id === user.storeId).map(s => ({ value: s.id, label: s.name }))
+                            : (Array.isArray(stores) ? stores : []).map(s => ({ value: s.id, label: s.name }))
                         }
                         defaultValue={user?.storeId || ''}
                     />

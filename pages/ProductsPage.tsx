@@ -30,7 +30,8 @@ const ProductsPage: React.FC = () => {
           setServerTotal(((p as any)?.meta?.total) || arr.length);
           if (hasPermission(Permission.VIEW_CATEGORIES)) {
             const c = await apiCategories.fetchCategories();
-            setCategories(c as any);
+            const normalizedCategories = Array.isArray(c) ? c : (Array.isArray((c as any)?.data) ? (c as any).data : []);
+            setCategories(normalizedCategories as any);
           } else {
             setCategories([]);
           }
@@ -60,7 +61,10 @@ const ProductsPage: React.FC = () => {
     load();
   }, [currentPage, search, categoryId, hasPermission]);
 
-  const categoryMap = useMemo(() => new Map(categories.map((c: any) => [c.id, c.name])), [categories]);
+  const categoryMap = useMemo(() => {
+    const list = Array.isArray(categories) ? categories : [];
+    return new Map(list.map((c: any) => [c.id, c.name]));
+  }, [categories]);
 
   const data = useMemo(() => {
     if (USE_API) return products;

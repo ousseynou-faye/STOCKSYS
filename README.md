@@ -1,5 +1,3 @@
-<!-- 
+# APPLICATION GESTION DE STOCKSYS
 
-   Voici l'application de Gestion De Stocks Générale Pour gérer tout les boutiques
-
- -->
+### Créer une application de Gestion de Stocks Générale 

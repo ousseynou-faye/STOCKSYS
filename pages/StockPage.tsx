@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, Table, Button, Modal, Input, Select, ExportDropdown } from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
@@ -71,7 +71,7 @@ const StockLevelList: React.FC = () => {
                     setCategories(((c as any)?.data) || (c as any) || []);
                 } catch (e: any) {
                     if (e?.status === 403) {
-                        addToast({ message: 'AccÃ¨s refusÃ© â€” permission requise: VIEW_STOCK', type: 'error' });
+                        addToast({ message: 'Accès refusé — permission requise: VIEW_STOCK', type: 'error' });
                         setStockLevels([]);
                         setProducts([]);
                         setStores([]);
@@ -145,11 +145,14 @@ const StockLevelList: React.FC = () => {
         const formData = new FormData(e.currentTarget);
         const raw = formData.get('newQuantity');
         const parsedQty = Number(raw);
-        if (!Number.isFinite(parsedQty) || parsedQty < 0) { addToast({ message: 'Quantité invalide. Entrez un nombre ≥ 0.', type: 'error' }); return; }
-        if (Math.floor(parsedQty) !== parsedQty) { addToast({ message: 'La quantité doit être un entier.', type: 'error' }); return; }
+        if (!Number.isFinite(parsedQty) || parsedQty < 0) { addToast({ message: 'Quantit� invalide. Entrez un nombre = 0.', type: 'error' }); return; }
+        if (Math.floor(parsedQty) !== parsedQty) { addToast({ message: 'La quantit� doit �tre un entier.', type: 'error' }); return; }
         const newQuantity = parsedQty;
-        if (typeof adjustingStock.quantity === 'number' && newQuantity === adjustingStock.quantity) { addToast({ message: 'Aucune modification: quantité identique.', type: 'info' }); return; }
-        const ok = window.confirm(`Confirmer l'ajustement du stock\n${adjustingStock.productName} ${adjustingStock.variationName ? '('+adjustingStock.variationName+')' : ''}\n${adjustingStock.storeName}\n${adjustingStock.quantity} → ${newQuantity}`);
+        if (typeof adjustingStock.quantity === 'number' && newQuantity === adjustingStock.quantity) { addToast({ message: 'Aucune modification: quantit� identique.', type: 'info' }); return; }
+        const ok = window.confirm(`Confirmer l'ajustement du stock
+${adjustingStock.productName} ${adjustingStock.variationName ? '('+adjustingStock.variationName+')' : ''}
+${adjustingStock.storeName}
+${adjustingStock.quantity} ? ${newQuantity}`);
         if (!ok) return;
 
         try { if (USE_API) await apiStockSvc.adjust(adjustingStock.variationId, adjustingStock.storeId, newQuantity); else await apiAdjustStock(adjustingStock.variationId, adjustingStock.storeId, newQuantity, user.id); } catch (err) { addToast({ message: (err as any)?.message || 'Echec de l\'ajustement du stock.', type: 'error' }); return; }
@@ -177,7 +180,7 @@ const StockLevelList: React.FC = () => {
         ) },
         { header: 'Boutique', accessor: 'storeName' },
         { header: 'SKU', accessor: 'sku' },
-        { header: 'QuantitÃ©', accessor: (item: any) => (
+        { header: 'Quantité', accessor: (item: any) => (
             <span className={item.isLow ? 'text-danger font-bold' : ''}>{item.quantity}</span>
         ) },
         { header: 'Actions', accessor: (item: any) => {
@@ -194,15 +197,15 @@ const StockLevelList: React.FC = () => {
         'Variation': s?.variationName,
         'SKU': s?.sku,
         'Boutique': s?.storeName,
-        'QuantitÃ©': s?.quantity
+        'Quantité': s?.quantity
     }));
 
     return (
         <div className="space-y-4">
              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <p className="text-lg text-text-secondary">Consultez et gÃ©rez les produits et leurs niveaux de stock.</p>
+                <p className="text-lg text-text-secondary">Consultez et gérez les produits et leurs niveaux de stock.</p>
                 <div className="flex items-center gap-2 self-end sm:self-center">
-                    <ExportDropdown data={exportableData} columns={['Produit', 'Variation', 'SKU', 'Boutique', 'QuantitÃ©']} filename="niveaux_de_stock" />
+                    <ExportDropdown data={exportableData} columns={['Produit', 'Variation', 'SKU', 'Boutique', 'Quantité']} filename="niveaux_de_stock" />
                     {hasPermission(Permission.MANAGE_STOCK_TRANSFERS) && <Button variant="secondary" onClick={() => setIsTransferModalOpen(true)}>Nouveau Transfert</Button>}
                     {hasPermission(Permission.MANAGE_STOCK) && <Button onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}>Nouveau Produit</Button>}
                 </div>
@@ -230,8 +233,8 @@ const StockLevelList: React.FC = () => {
                     <form className="space-y-4" onSubmit={handleAdjustStock}>
                         <p>Produit: <span className="font-bold">{adjustingStock.productName} ({adjustingStock.variationName})</span></p>
                         <p>Boutique: <span className="font-bold">{adjustingStock.storeName}</span></p>
-                        <p>QuantitÃ© actuelle: <span className="font-bold">{adjustingStock.quantity}</span></p>
-                        <Input label="Nouvelle quantitÃ©" id="newQuantity" name="newQuantity" type="number" required defaultValue={adjustingStock.quantity} />
+                        <p>Quantité actuelle: <span className="font-bold">{adjustingStock.quantity}</span></p>
+                        <Input label="Nouvelle quantité" id="newQuantity" name="newQuantity" type="number" required defaultValue={adjustingStock.quantity} />
                          <div className="flex justify-end space-x-2 pt-4">
                             <Button type="button" variant="secondary" onClick={() => setIsAdjustModalOpen(false)}>Annuler</Button>
                             <Button type="submit">Enregistrer</Button>
@@ -308,11 +311,11 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose, stores, 
             return;
         }
         if (fromStoreId === toStoreId) {
-            addToast({ message: "Les boutiques d'origine et de destination doivent Ãªtre diffÃ©rentes.", type: 'error' });
+            addToast({ message: "Les boutiques d'origine et de destination doivent être différentes.", type: 'error' });
             return;
         }
         await apiCreateStockTransfer(fromStoreId, toStoreId, transferItems.filter(i => i.quantity > 0), user.id);
-        addToast({ message: 'Transfert de stock enregistrÃ©.', type: 'success' });
+        addToast({ message: 'Transfert de stock enregistré.', type: 'success' });
         onSave();
         onClose();
     };
@@ -326,7 +329,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ isOpen, onClose, stores, 
                 </div>
                 <Card>
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold">Articles Ã  transfÃ©rer</h3>
+                        <h3 className="font-semibold">Articles à transférer</h3>
                         <Select value="" onChange={e => handleAddItem(e.target.value)} options={[{ value: '', label: 'Ajouter un produit...' }, ...availableProductsForTransfer]} disabled={!fromStoreId} />
                     </div>
                     <div className="max-h-60 overflow-y-auto">
@@ -443,9 +446,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
     const [selVar, setSelVar] = useState('');
     const [selQty, setSelQty] = useState(1);
     const addBundleComp = () => {
-        if (!selVar) { addToast({ message: 'Sélectionnez une variation.', type: 'error' }); return; }
-        if (!Number.isFinite(selQty) || selQty <= 0 || Math.floor(selQty) !== selQty) { addToast({ message: 'Quantité composant invalide (entier > 0).', type: 'error' }); return; }
-        if (bundleComps.some(b => b.componentVariationId === selVar)) { addToast({ message: 'Ce composant est déjà ajouté.', type: 'info' }); return; }
+        if (!selVar) { addToast({ message: 'S�lectionnez une variation.', type: 'error' }); return; }
+        if (!Number.isFinite(selQty) || selQty <= 0 || Math.floor(selQty) !== selQty) { addToast({ message: 'Quantit� composant invalide (entier > 0).', type: 'error' }); return; }
+        if (bundleComps.some(b => b.componentVariationId === selVar)) { addToast({ message: 'Ce composant est d�j� ajout�.', type: 'info' }); return; }
         if (product && product.variations?.some(v => v.id === selVar)) { addToast({ message: 'Un produit ne peut pas contenir sa propre variation en composant.', type: 'error' }); return; }
         setBundleComps(prev => [...prev, { componentVariationId: selVar, quantity: selQty }]);
         setSelVar(''); setSelQty(1);
@@ -459,10 +462,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
         e.preventDefault();
         if (!user) return;
         
-        // Pré‑validation produit
+        // Pr�-validation produit
         const pd: any = productData || {};
         if (!pd.name || String(pd.name).trim().length < 2) { addToast({ message: 'Nom de produit trop court.', type: 'error' }); return; }
-        if (!pd.categoryId) { addToast({ message: 'Catégorie requise.', type: 'error' }); return; }
+        if (!pd.categoryId) { addToast({ message: 'Cat�gorie requise.', type: 'error' }); return; }
         if (pd.lowStockThreshold !== undefined && (!Number.isFinite(Number(pd.lowStockThreshold)) || Number(pd.lowStockThreshold) < 0)) { addToast({ message: 'Seuil low stock invalide.', type: 'error' }); return; }
 
         if (pd.type === ProductType.STANDARD) {
@@ -480,12 +483,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             if (bundleComps.length === 0) { addToast({ message: 'Ajoutez au moins un composant au bundle.', type: 'error' }); return; }
             for (const c of bundleComps) {
                 if (!Number.isFinite(Number(c.quantity)) || Number(c.quantity) <= 0 || Math.floor(Number(c.quantity)) !== Number(c.quantity)) {
-                    addToast({ message: 'Quantité composant invalide (entier > 0).', type: 'error' }); return;
+                    addToast({ message: 'Quantit� composant invalide (entier > 0).', type: 'error' }); return;
                 }
             }
         }
 
-        const confirmMsg = product ? 'Confirmer la mise à jour du produit ?' : 'Confirmer la création du produit ?';
+        const confirmMsg = product ? 'Confirmer la mise � jour du produit ?' : 'Confirmer la cr�ation du produit ?';
         if (!window.confirm(confirmMsg)) return;
         
         if (product) {
@@ -497,7 +500,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             } else {
                 await apiUpdateProduct(product.id, (productData.type === ProductType.BUNDLE ? { ...productData, bundleComponents: bundleComps } : productData) as any, user.id);
             }
-            addToast({ message: 'Produit mis à jour.', type: 'success' });
+            addToast({ message: 'Produit mis � jour.', type: 'success' });
         } else {
             if (USE_API) {
                 const created: any = await apiProducts.createProduct(productData);
@@ -507,7 +510,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             } else {
                 await apiCreateProduct((productData.type === ProductType.BUNDLE ? { ...productData, bundleComponents: bundleComps } : productData) as any, user.id);
             }
-            addToast({ message: 'Produit créé.', type: 'success' });
+            addToast({ message: 'Produit cr��.', type: 'success' });
         }
         onSave();
         onClose();
@@ -518,7 +521,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Select label="Type de produit" name="type" id="type" value={productData.type} onChange={handleChange} options={Object.values(ProductType).map(t => ({ value: t, label: t }))} />
                 <Input label="Nom du produit" id="name" name="name" required value={productData.name || ''} onChange={handleChange} />
-                <Select label="CatÃ©gorie" id="categoryId" name="categoryId" required value={productData.categoryId || ''} onChange={handleChange} options={categories.map(c => ({value: c.id, label: c.name}))} />
+                <Select label="Catégorie" id="categoryId" name="categoryId" required value={productData.categoryId || ''} onChange={handleChange} options={categories.map(c => ({value: c.id, label: c.name}))} />
                 <Input label="Seuil de stock bas" id="lowStockThreshold" name="lowStockThreshold" type="number" required value={productData.lowStockThreshold || ''} onChange={handleChange} />
 
                 {productData.type === ProductType.STANDARD && (
@@ -547,8 +550,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
                     <div>
                         <h3 className="font-semibold mb-2">Composition du Kit</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end mb-2">
-                            <Select id="bundle-var" label="Article" value={selVar} onChange={(e) => setSelVar(e.target.value)} options={[{ value: '', label: 'SÃ©lectionner...' }, ...variationChoices]} />
-                            <Input id="bundle-qty" label="QuantitÃ©" type="number" value={selQty} onChange={(e) => setSelQty(Number(e.target.value))} />
+                            <Select id="bundle-var" label="Article" value={selVar} onChange={(e) => setSelVar(e.target.value)} options={[{ value: '', label: 'Sélectionner...' }, ...variationChoices]} />
+                            <Input id="bundle-qty" label="Quantité" type="number" value={selQty} onChange={(e) => setSelQty(Number(e.target.value))} />
                             <Button type="button" variant="secondary" onClick={addBundleComp} className="flex items-center"><PlusIcon className="mr-1"/> Ajouter</Button>
                         </div>
                         <div className="bg-background rounded">
@@ -622,16 +625,17 @@ const StockTransferModal: React.FC<{
                 }
                 if (p.id === s.variationId) { label = `${p.name}${p.sku ? ' [' + p.sku + ']' : ''}`; break; }
             }
-            opts.push({ value: s.variationId, label: `${label} â€” dispo: ${s.quantity}`, available: s.quantity });
+            opts.push({ value: s.variationId, label: `${label} � dispo: ${s.quantity}`, available: s.quantity });
         });
-        return opts;
+        const seen = new Set<string>();
+        return opts.filter(o => (seen.has(o.value) ? false : (seen.add(o.value), true)));
     }, [stockLevels, products, fromStoreId]);
 
     const addItem = () => {
         if (!selectedVariationId || quantity <= 0) return;
         const opt = stockOptions.find(o => o.value === selectedVariationId);
         if (!opt) return;
-        if (quantity > opt.available) { alert('QuantitÃ© supÃ©rieure au stock disponible.'); return; }
+        if (quantity > opt.available) { alert('Quantité supérieure au stock disponible.'); return; }
         setItems(prev => [...prev, { variationId: selectedVariationId, quantity }]);
         setSelectedVariationId('');
         setQuantity(1);
@@ -641,14 +645,14 @@ const StockTransferModal: React.FC<{
 
     const submitTransfer = async () => {
         try {
-            if (!fromStoreId || !toStoreId) { alert('SÃ©lectionnez les deux boutiques.'); return; }
-            if (fromStoreId === toStoreId) { alert('La boutique source doit Ãªtre diffÃ©rente de la destination.'); return; }
+            if (!fromStoreId || !toStoreId) { alert('Sélectionnez les deux boutiques.'); return; }
+            if (fromStoreId === toStoreId) { alert('La boutique source doit être différente de la destination.'); return; }
             if (items.length === 0) { alert('Ajoutez au moins un article.'); return; }
             if (USE_API) await apiStockSvc.transfer(fromStoreId, toStoreId, items); else await apiCreateStockTransfer(fromStoreId, toStoreId, items, user?.id || 'sys');
-            addToast({ message: 'Transfert crÃ©Ã©.', type: 'success' });
+            addToast({ message: 'Transfert créé.', type: 'success' });
             onClose(); onSave();
         } catch (e: any) {
-            addToast({ message: e?.message || 'Ã‰chec du transfert', type: 'error' });
+            addToast({ message: e?.message || 'Échec du transfert', type: 'error' });
         }
     };
 
@@ -656,18 +660,18 @@ const StockTransferModal: React.FC<{
         <Modal isOpen={isOpen} onClose={onClose} title="Nouveau Transfert" wrapperClassName="md:max-w-3xl">
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Select id="fromStore" label="Depuis" value={fromStoreId} onChange={e => setFromStoreId(e.target.value)} options={[{ value: '', label: 'SÃ©lectionner...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]} />
-                    <Select id="toStore" label="Vers" value={toStoreId} onChange={e => setToStoreId(e.target.value)} options={[{ value: '', label: 'SÃ©lectionner...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]} />
+                    <Select id="fromStore" label="Depuis" value={fromStoreId} onChange={e => setFromStoreId(e.target.value)} options={[{ value: '', label: 'Sélectionner...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]} />
+                    <Select id="toStore" label="Vers" value={toStoreId} onChange={e => setToStoreId(e.target.value)} options={[{ value: '', label: 'Sélectionner...' }, ...stores.map(s => ({ value: s.id, label: s.name }))]} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                     <Select id="variation" label="Article" value={selectedVariationId} onChange={e => setSelectedVariationId(e.target.value)} options={[{ value: '', label: 'Choisir...' }, ...stockOptions.map(o => ({ value: o.value, label: o.label }))]} />
-                    <Input id="qty" label="QuantitÃ©" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+                    <Input id="qty" label="Quantité" type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
                     <Button onClick={addItem}>Ajouter</Button>
                 </div>
                 <div className="bg-surface rounded-lg border border-secondary/40">
                     <table className="w-full text-left">
                         <thead>
-                            <tr className="border-b border-secondary/60"><th className="p-2">Article</th><th className="p-2">QtÃ©</th><th className="p-2"></th></tr>
+                            <tr className="border-b border-secondary/60"><th className="p-2">Article</th><th className="p-2">Qté</th><th className="p-2"></th></tr>
                         </thead>
                         <tbody>
                             {items.map((it, idx) => {
@@ -680,18 +684,23 @@ const StockTransferModal: React.FC<{
                                     </tr>
                                 );
                             })}
-                            {items.length === 0 && <tr><td className="p-3 text-text-secondary" colSpan={3}>Aucun article sÃ©lectionnÃ©.</td></tr>}
+                            {items.length === 0 && <tr><td className="p-3 text-text-secondary" colSpan={3}>Aucun article sélectionné.</td></tr>}
                         </tbody>
                     </table>
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={onClose}>Annuler</Button>
-                    <Button onClick={submitTransfer}>CrÃ©er le transfert</Button>
+                    <Button onClick={submitTransfer}>Créer le transfert</Button>
                 </div>
             </div>
         </Modal>
     );
 };
+
+
+
+
+
 
 
 
