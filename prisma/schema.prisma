@@ -1,0 +1,514 @@
+// Prisma schema for StockSys backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================
+// Enums
+// ==========================
+
+enum Permission {
+  // Sales
+  CREATE_SALE
+  VIEW_SALES_HISTORY
+  MANAGE_RETURNS
+
+  // Stock
+  VIEW_STOCK
+  MANAGE_STOCK
+  PERFORM_INVENTORY
+  MANAGE_STOCK_TRANSFERS
+
+  // Purchases
+  VIEW_PURCHASES
+  CREATE_PURCHASE_ORDER
+  MANAGE_PURCHASE_ORDERS
+
+  // Suppliers
+  VIEW_SUPPLIERS
+  MANAGE_SUPPLIERS
+
+  // Expenses
+  VIEW_EXPENSES
+  MANAGE_EXPENSES
+
+  // Reports
+  VIEW_REPORTS
+
+  // Users & Roles
+  VIEW_USERS
+  MANAGE_USERS
+  VIEW_ROLES
+  MANAGE_ROLES
+
+  // Settings & Configuration
+  VIEW_CATEGORIES
+  MANAGE_CATEGORIES
+  VIEW_STORES
+  MANAGE_STORES
+  MANAGE_SETTINGS
+
+  // Dashboard
+  VIEW_DASHBOARD_STATS
+  VIEW_DASHBOARD_CASHIER
+
+  // Audit
+  VIEW_AUDIT_LOG
+
+  // Cashier sessions
+  MANAGE_CASHIER_SESSIONS
+}
+
+enum ProductType {
+  STANDARD
+  VARIABLE
+  BUNDLE
+}
+
+enum SaleStatus {
+  COMPLETED
+  PENDING_SYNC
+  RETURNED
+  PARTIALLY_PAID
+  UNPAID
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum InventorySessionStatus {
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+}
+
+enum NotificationType {
+  SALE
+  TRANSFER
+  ALERT
+  PURCHASE
+  INVENTORY
+}
+
+enum AuditActionType {
+  USER_LOGIN
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  ROLE_CREATE
+  ROLE_UPDATE
+  ROLE_DELETE
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  STOCK_ADJUSTMENT
+  STOCK_TRANSFER
+  PURCHASE_ORDER_CREATE
+  PURCHASE_ORDER_UPDATE
+  SETTINGS_UPDATE
+}
+
+// ==========================
+// Core Models
+// ==========================
+
+model User {
+  id                String   @id @default(cuid())
+  username          String   @unique
+  passwordHash      String
+  profilePictureUrl String?
+  storeId           String?
+  store             Store?   @relation(fields: [storeId], references: [id])
+  roles             Role[]
+  auditLogs         AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales     Sale[]
+  cashierSessions CashierSession[]
+  inventorySessions InventorySession[]
+  expenses Expense[]
+  purchaseOrdersCreated PurchaseOrder[]
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  permissions Permission[]
+  users       User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Store {
+  id   String @id @default(cuid())
+  name String
+
+  users         User[]
+  stocks        ProductStock[]
+  sales         Sale[]
+  purchases     PurchaseOrder[]
+  expenses      Expense[]
+  notifications Notification[]
+  settings      Setting[]
+  cashierSessions CashierSession[]
+  inventories   InventorySession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id   String @id @default(cuid())
+  name String
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Product {
+  id                 String       @id @default(cuid())
+  name               String
+  type               ProductType
+  lowStockThreshold  Int          @default(0)
+  sku                String?      @unique
+  price              Float?
+  categoryId         String
+  category           Category     @relation(fields: [categoryId], references: [id])
+
+  variations         ProductVariation[]
+  bundleComponents   BundleComponent[] @relation("Bundle_Product")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([type])
+}
+
+model ProductVariation {
+  id         String  @id @default(cuid())
+  sku        String  @unique
+  price      Float
+  attributes Json
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+
+  bundleComponents BundleComponent[] @relation("Component_Variation")
+  stocks           ProductStock[]
+  saleItems        SaleItem[]
+  purchaseItems    PurchaseOrderItem[]
+  notifications    Notification[]
+  supplierProducts SupplierProduct[]
+  inventoryCountItems InventoryCountItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model BundleComponent {
+  id                   Int               @id @default(autoincrement())
+  bundleProductId      String
+  componentVariationId String
+  quantity             Int
+
+  bundleProduct  Product          @relation("Bundle_Product", fields: [bundleProductId], references: [id])
+  component      ProductVariation @relation("Component_Variation", fields: [componentVariationId], references: [id])
+
+  @@index([bundleProductId])
+  @@index([componentVariationId])
+  @@unique([bundleProductId, componentVariationId])
+}
+
+model ProductStock {
+  id          String          @id @default(cuid())
+  quantity    Int
+  storeId     String
+  variationId String
+
+  store     Store           @relation(fields: [storeId], references: [id])
+  variation ProductVariation @relation(fields: [variationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, variationId])
+  @@index([storeId])
+  @@index([variationId])
+}
+
+model Sale {
+  id          String     @id @default(cuid())
+  totalAmount Float
+  status      SaleStatus
+  createdAt   DateTime   @default(now())
+
+  userId  String
+  storeId String
+  user    User @relation(fields: [userId], references: [id])
+  store   Store @relation(fields: [storeId], references: [id])
+
+  items    SaleItem[]
+  payments Payment[]
+
+  @@index([createdAt])
+  @@index([storeId])
+  @@index([userId])
+}
+
+model SaleItem {
+  id           Int     @id @default(autoincrement())
+  quantity     Int
+  priceAtSale  Float
+
+  saleId       String
+  variationId  String
+  sale         Sale            @relation(fields: [saleId], references: [id])
+  variation    ProductVariation @relation(fields: [variationId], references: [id])
+
+  @@index([saleId])
+  @@index([variationId])
+}
+
+model Payment {
+  id        Int           @id @default(autoincrement())
+  method    PaymentMethod
+  amount    Float
+  createdAt DateTime      @default(now())
+
+  saleId String
+  sale   Sale @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+}
+
+// ==========================
+// Procurement & Expenses
+// ==========================
+
+model Supplier {
+  id          String  @id @default(cuid())
+  name        String
+  contactPerson String?
+  email       String?
+  phone       String?
+  address     String?
+  paymentTerms String?
+  extra       Json?
+
+  purchaseOrders PurchaseOrder[]
+  products        SupplierProduct[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model PurchaseOrder {
+  id          String               @id @default(cuid())
+  supplierId  String
+  storeId     String
+  status      PurchaseOrderStatus  @default(DRAFT)
+  totalAmount Float                @default(0)
+  createdAt   DateTime             @default(now())
+  receivedAt  DateTime?
+  createdById String?
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
+  createdBy User?   @relation(fields: [createdById], references: [id])
+  items    PurchaseOrderItem[]
+
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id              Int      @id @default(autoincrement())
+  purchaseOrderId String
+  variationId     String
+  quantity        Int
+  price           Float
+  receivedQuantity Int     @default(0)
+
+  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  variation     ProductVariation @relation(fields: [variationId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([variationId])
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  userId     String
+  storeId    String
+  category   String
+  description String
+  amount     Float
+  createdAt  DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==========================
+// Inventory & Cashier Session
+// ==========================
+
+model InventorySession {
+  id         String                 @id @default(cuid())
+  storeId    String
+  userId     String
+  status     InventorySessionStatus @default(IN_PROGRESS)
+  createdAt  DateTime               @default(now())
+  completedAt DateTime?
+
+  store Store @relation(fields: [storeId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  items InventoryCountItem[]
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model InventoryCountItem {
+  id                  Int     @id @default(autoincrement())
+  sessionId           String
+  variationId         String
+  theoreticalQuantity Int
+  countedQuantity     Int
+
+  session   InventorySession @relation(fields: [sessionId], references: [id])
+  variation ProductVariation @relation(fields: [variationId], references: [id])
+
+  @@index([sessionId])
+  @@index([variationId])
+  @@unique([sessionId, variationId])
+}
+
+model CashierSession {
+  id              String   @id @default(cuid())
+  userId          String
+  storeId         String
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  openingBalance  Float
+  closingBalance  Float?
+  theoreticalSales Json?
+  difference      Float?
+  createdAt       DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([startedAt])
+}
+
+// ==========================
+// System & Utilities
+// ==========================
+
+model AuditLog {
+  id         String          @id @default(cuid())
+  action     AuditActionType
+  details    String
+  username   String?
+  entityType String?
+  entityId   String?
+  userId     String?
+  ip         String?
+  metadata   Json?
+  createdAt  DateTime        @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType])
+  @@index([createdAt])
+  // Indexes to speed up server-side filtering & sorting
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  // Composite index when filtering by both userId & action and sorting by createdAt
+  @@index([userId, action, createdAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  type        NotificationType
+  message     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  storeId     String?
+  variationId String?
+  store       Store?            @relation(fields: [storeId], references: [id])
+  variation   ProductVariation? @relation(fields: [variationId], references: [id])
+
+  @@index([storeId])
+  @@index([variationId])
+  @@index([read])
+}
+
+model Setting {
+  id      String @id @default(cuid())
+  key     String
+  value   Json
+  storeId String?
+  store   Store? @relation(fields: [storeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Unique per scope: global (storeId null) or per store
+  @@unique([key, storeId])
+}
+
+// Supplier catalogue (variation-level)
+model SupplierProduct {
+  id           String           @id @default(cuid())
+  supplierId   String
+  variationId  String
+  purchasePrice Float
+  supplierSku  String
+
+  supplier Supplier        @relation(fields: [supplierId], references: [id])
+  variation ProductVariation @relation(fields: [variationId], references: [id])
+
+  @@unique([supplierId, variationId])
+  @@index([supplierId])
+  @@index([variationId])
+}

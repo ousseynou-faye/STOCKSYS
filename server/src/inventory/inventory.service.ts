@@ -1,0 +1,84 @@
+﻿import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { AuditNotifyService } from '../common/services/audit-notify.service.js';
+import { FR } from '../common/i18n/fr.js';
+
+@Injectable()
+export class InventoryService {
+  constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
+
+    async list(q?: any) {
+    const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
+    const skip = (page - 1) * limit;
+    const sort = (q?.sort as string) || '-createdAt';
+    const orderBy = Array.isArray(sort)
+      ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
+      : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
+    const where: any = {};
+    if (q?.storeId) where.storeId = q.storeId;
+    if (q?.status) where.status = q.status;
+    const total = await this.prisma.inventorySession.count({ where });
+    const data = await this.prisma.inventorySession.findMany({ where, orderBy, skip, take: limit, include: { items: true } });
+    return { data, meta: { page, limit, total } };
+  
+  }
+
+  async start(storeId: string, user?: any) {
+    const stock = await this.prisma.productStock.findMany({ where: { storeId } });
+    const session = await this.prisma.inventorySession.create({
+      data: {
+        storeId,
+        userId: user?.sub,
+        items: { create: stock.map((s: any) => ({ variationId: s.variationId, theoreticalQuantity: s.quantity, countedQuantity: -1 })) },
+      },
+      include: { items: true },
+    });
+    await this.audit.audit(this.prisma, { action: 'STOCK_ADJUSTMENT', details: `Inventaire #${session.id.slice(-6)} dÃ©marrÃ©.`, user, entityType: 'InventorySession', entityId: session.id });
+    return session;
+  }
+
+  async updateCounts(id: string, items: { variationId: string; countedQuantity: number }[], finalize: boolean, user?: any) {
+    const session = await this.prisma.inventorySession.findUnique({ where: { id } });
+    if (!session) throw new NotFoundException('Session not found');
+    await this.prisma.$transaction(items.map(i => this.prisma.inventoryCountItem.update({
+      where: { sessionId_variationId: { sessionId: id, variationId: i.variationId } },
+      data: { countedQuantity: i.countedQuantity },
+    })));
+    if (finalize) {
+      await this.prisma.inventorySession.update({ where: { id }, data: { status: 'REVIEW' as any } });
+    }
+    await this.audit.audit(this.prisma, { action: 'STOCK_ADJUSTMENT', details: `Comptage inventaire #${id.slice(-6)} mis à jour.`, user, entityType: 'InventorySession', entityId: id });
+    return this.prisma.inventorySession.findUnique({ where: { id }, include: { items: true } });
+  }
+  async confirm(id: string, user?: any) {
+    const session = await this.prisma.inventorySession.findUnique({ where: { id }, include: { items: true } });
+    if (!session) throw new NotFoundException('Session not found');
+    if (session.status !== 'REVIEW') throw new BadRequestException(FR.ERR_INVENTORY_NOT_IN_REVIEW);
+    if (session.items.some((i: any) => i.countedQuantity === -1)) throw new BadRequestException(FR.ERR_INVENTORY_UNCOUNTED_ITEMS);
+
+    await this.prisma.$transaction(async (tx: any) => {
+      const varIds = session.items.map((i: any) => i.variationId);
+      const stocks = await tx.productStock.findMany({ where: { storeId: session.storeId, variationId: { in: varIds } } });
+      const beforeMap = new Map(stocks.map((s: any) => [s.variationId, s.quantity]));
+      for (const item of session.items) {
+        const before = beforeMap.get(item.variationId) ?? 0;
+        await tx.productStock.update({ where: { storeId_variationId: { storeId: session.storeId, variationId: item.variationId } }, data: { quantity: item.countedQuantity } });
+        await this.audit.audit(tx, { action: 'STOCK_ADJUSTMENT', details: `Inventaire #${id.slice(-6)} - ${item.variationId}: ${before} -> ${item.countedQuantity}`, user, entityType: 'InventorySession', entityId: id });
+      }
+      await tx.inventorySession.update({ where: { id }, data: { status: 'COMPLETED' as any, completedAt: new Date() } });
+    });
+
+    return { success: true };
+  }
+}
+
+
+
+
+
+
+
+
+
+

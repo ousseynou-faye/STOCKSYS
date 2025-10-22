@@ -1,0 +1,272 @@
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { Card, Button, Modal, Input, Table, Select } from '../components/ui';
+import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../contexts/ToastContext';
+// Fix: Add missing imports
+import { CashierSession, PaymentMethod, Sale, Permission } from '../types';
+import { apiFetchActiveCashierSession, apiStartCashierSession, apiCloseCashierSession, apiFetchSales, apiFetchCashierSessions, MOCK_USERS, MOCK_STORES } from '../services/mockApi';
+import { USE_API } from '../services/apiClient';
+import { apiCashier } from '../services/apiCashier';
+import { apiStores } from '../services/apiStores';
+import { apiUsers } from '../services/apiUsers';
+
+const formatCurrency = (value: number) => `${Math.round(value).toLocaleString('fr-FR')} FCFA`;
+
+const CashierClosingPage: React.FC = () => {
+    const { user, hasPermission } = useAuth();
+    const { addToast } = useToast();
+    const [activeSession, setActiveSession] = useState<CashierSession | null>(null);
+    const [sessionHistory, setSessionHistory] = useState<CashierSession[]>([]);
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyTotal, setHistoryTotal] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isStartModalOpen, setIsStartModalOpen] = useState(false);
+    const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+    const [openingBalance, setOpeningBalance] = useState(0);
+    const [closingBalance, setClosingBalance] = useState(0);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [salesInSession, setSalesInSession] = useState<Sale[]>([]);
+    const [stores, setStores] = useState<any[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
+    const [sessionSummaryLive, setSessionSummaryLive] = useState<any | null>(null);
+    
+    // Admin filter
+    const [filterStoreId, setFilterStoreId] = useState('');
+
+    const isAdmin = useMemo(() => hasPermission(Permission.MANAGE_CASHIER_SESSIONS), [hasPermission]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchData = async () => {
+            setIsLoading(true);
+
+            // Charger données de référence (boutiques/utilisateurs) pour libellés
+            if (USE_API) {
+                try {
+                    if (isAdmin) {
+                        const s = await apiStores.fetchStores();
+                        setStores((Array.isArray(s) ? s : (s as any)?.data || []) as any);
+                    } else {
+                        setStores([]);
+                    }
+                    const us = await apiUsers.fetchUsers();
+                    setUsers((Array.isArray(us) ? us : (us as any)?.data || []) as any);
+                } catch {
+                    setStores([]);
+                    setUsers([]);
+                }
+            } else {
+                setStores(MOCK_STORES as any);
+                setUsers(MOCK_USERS as any);
+            }
+
+            // Regular user: fetch their active session and store history
+            if (!isAdmin && user.storeId) {
+                const session = USE_API ? (await apiCashier.fetchActive(user.id, user.storeId) as any) : await apiFetchActiveCashierSession(user.id, user.storeId);
+                setActiveSession(session);
+                if (session) {
+                    if (USE_API) {
+                        try {
+                            const sum: any = await apiCashier.liveSummary(session.id);
+                            setSessionSummaryLive(sum);
+                        } catch { setSessionSummaryLive(null); }
+                        setSalesInSession([]);
+                    } else {
+                        const allSales = apiFetchSales();
+                        const sessionSales = allSales.filter(sale => 
+                            sale.storeId === session.storeId &&
+                            new Date(sale.createdAt) >= new Date(session.startedAt)
+                        );
+                        setSalesInSession(sessionSales);
+                    }
+                }
+            } else {
+                // Admin has no personal active session
+                setActiveSession(null);
+            }
+            
+            // Fetch all history for admin, or just store-specific for others
+            if (USE_API) {
+                try {
+                    const res = await apiCashier.fetchSessions({ page: historyPage, limit: 10, storeId: isAdmin ? (filterStoreId || undefined) : user?.storeId });
+                    setSessionHistory((res as any)?.data || res);
+                    setHistoryTotal(((res as any)?.meta?.total) || 0);
+                } catch (e: any) {
+                    if (e?.status === 403) {
+                        addToast({ message: 'Accès refusé — permission requise: MANAGE_CASHIER_SESSIONS', type: 'error' });
+                        setSessionHistory([]);
+                        setHistoryTotal(0);
+                    } else {
+                        const history = apiFetchCashierSessions();
+                        setSessionHistory(history);
+                        setHistoryTotal(history.length);
+                    }
+                }
+            } else {
+                const history = apiFetchCashierSessions();
+                setSessionHistory(history);
+                setHistoryTotal(history.length);
+            }
+            
+            setIsLoading(false);
+        };
+
+        fetchData();
+    }, [user, refreshKey, isAdmin, historyPage, filterStoreId]);
+
+    const filteredHistory = useMemo(() => {
+        if (isAdmin) {
+            return sessionHistory.filter(s => !filterStoreId || s.storeId === filterStoreId);
+        }
+        return sessionHistory.filter(s => s.storeId === user?.storeId);
+    }, [sessionHistory, isAdmin, filterStoreId, user]);
+
+
+    const sessionSummary = useMemo(() => {
+        if (!activeSession) return null;
+        if (USE_API && sessionSummaryLive) return sessionSummaryLive;
+
+        const summary = {
+            [PaymentMethod.CASH]: 0,
+            [PaymentMethod.CARD]: 0,
+            [PaymentMethod.MOBILE_MONEY]: 0,
+        } as any;
+        
+        salesInSession.forEach(sale => {
+            sale.payments.forEach(payment => {
+                if (new Date(payment.createdAt) >= new Date(activeSession.startedAt)) {
+                    if (summary[payment.method as keyof typeof summary] !== undefined) {
+                        summary[payment.method as keyof typeof summary] += payment.amount;
+                    }
+                }
+            });
+        });
+        
+        const expectedCash = activeSession.openingBalance + summary[PaymentMethod.CASH];
+        return { ...summary, expectedCash };
+    }, [activeSession, salesInSession, sessionSummaryLive]);
+    
+    const handleStartSession = async () => {
+        if (!user || !user.storeId) return;
+        try {
+            if (USE_API) await apiCashier.start(user.id, user.storeId, openingBalance); else await apiStartCashierSession(user.id, user.storeId, openingBalance);
+            addToast({ message: "Session démarrée avec succès.", type: 'success' });
+            setIsStartModalOpen(false);
+            setRefreshKey(k => k + 1);
+        } catch (error) {
+            addToast({ message: (error as Error).message, type: 'error' });
+        }
+    };
+    
+    const handleCloseSession = async () => {
+        if (!activeSession || !user) return;
+        try {
+            if (USE_API) await apiCashier.close(activeSession.id, closingBalance); else await apiCloseCashierSession(activeSession.id, closingBalance, user.id);
+            addToast({ message: "Session clôturée avec succès.", type: 'success' });
+            setIsCloseModalOpen(false);
+            setRefreshKey(k => k + 1);
+        } catch (error) {
+            addToast({ message: (error as Error).message, type: 'error' });
+        }
+    };
+    
+    const userMap = useMemo(() => new Map(users.map((u: any) => [u.id, u.username || u.email || u.name])), [users]);
+    const columns = [
+        { header: 'Date de Début', accessor: (s: CashierSession) => new Date(s.startedAt).toLocaleString('fr-FR') },
+        { header: 'Date de Fin', accessor: (s: CashierSession) => s.endedAt ? new Date(s.endedAt).toLocaleString('fr-FR') : 'En cours' },
+        { header: 'Caissier', accessor: (s: CashierSession) => (userMap.get(s.userId) || (MOCK_USERS.find(u => u.id === s.userId)?.username) || s.userId || 'N/A') },
+        { header: 'Fonds de Caisse', accessor: (s: CashierSession) => formatCurrency(s.openingBalance) },
+        { header: 'Espèces Théoriques', accessor: (s: CashierSession) => formatCurrency(s.theoreticalSales ? s.theoreticalSales[PaymentMethod.CASH] : 0) },
+        { header: 'Écart', accessor: (s: CashierSession) => s.difference !== null ? <span className={s.difference < 0 ? 'text-danger' : 'text-green-400'}>{formatCurrency(s.difference)}</span> : 'N/A' }
+    ];
+
+    if (isLoading) return <div className="text-center p-8">Chargement...</div>;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <h1 className="text-2xl font-bold">Clôture de Caisse</h1>
+                {!isAdmin && user?.storeId && (
+                    !activeSession ? (
+                        <Button onClick={() => setIsStartModalOpen(true)}>Démarrer la session</Button>
+                    ) : (
+                        <Button variant="danger" onClick={() => setIsCloseModalOpen(true)}>Clôturer la session</Button>
+                    )
+                )}
+            </div>
+
+            {activeSession && sessionSummary && (
+                <Card>
+                    <h2 className="text-xl font-semibold mb-4">Session en cours</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div className="bg-secondary/50 p-4 rounded-lg">
+                            <p className="text-sm text-text-secondary">Fonds de Caisse Initial</p>
+                            <p className="text-2xl font-bold">{formatCurrency(activeSession.openingBalance)}</p>
+                        </div>
+                         <div className="bg-secondary/50 p-4 rounded-lg">
+                            <p className="text-sm text-text-secondary">Ventes en Espèces</p>
+                            <p className="text-2xl font-bold">{formatCurrency(sessionSummary[PaymentMethod.CASH])}</p>
+                        </div>
+                         <div className="bg-secondary/50 p-4 rounded-lg">
+                            <p className="text-sm text-text-secondary">Autres Paiements</p>
+                            <p className="text-2xl font-bold">{formatCurrency(sessionSummary[PaymentMethod.CARD] + sessionSummary[PaymentMethod.MOBILE_MONEY])}</p>
+                        </div>
+                         <div className="bg-accent/20 p-4 rounded-lg border border-accent">
+                            <p className="text-sm text-accent">Total Attendu en Caisse</p>
+                            <p className="text-2xl font-bold text-accent">{formatCurrency(sessionSummary.expectedCash)}</p>
+                        </div>
+                    </div>
+                </Card>
+            )}
+
+            <Card>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-4">
+                    <h2 className="text-xl font-semibold">Historique des sessions</h2>
+                    {isAdmin && (
+                        <div className="w-full sm:w-64">
+                            <Select 
+                                label="Filtrer par boutique"
+                                id="store-filter"
+                                value={filterStoreId}
+                                onChange={(e) => setFilterStoreId(e.target.value)}
+                                options={[{ value: '', label: 'Toutes les boutiques'}, ...((USE_API ? stores : MOCK_STORES) as any[]).map((s: any) => ({ value: s.id, label: s.name }))]}
+                            />
+                        </div>
+                    )}
+                </div>
+                <Table columns={columns} data={filteredHistory} currentPage={historyPage} itemsPerPage={10} onPageChange={setHistoryPage} serverMode={USE_API} totalItems={USE_API ? historyTotal : undefined} />
+            </Card>
+
+            <Modal isOpen={isStartModalOpen} onClose={() => setIsStartModalOpen(false)} title="Démarrer une session de caisse">
+                <div className="space-y-4">
+                    <p>Entrez le montant de votre fonds de caisse initial.</p>
+                    <Input label="Fonds de caisse (FCFA)" id="openingBalance" type="number" value={openingBalance} onChange={e => setOpeningBalance(Number(e.target.value))} min="0" />
+                </div>
+                 <div className="flex justify-end space-x-2 pt-6">
+                    <Button variant="secondary" onClick={() => setIsStartModalOpen(false)}>Annuler</Button>
+                    <Button onClick={handleStartSession}>Démarrer</Button>
+                </div>
+            </Modal>
+            
+            <Modal isOpen={isCloseModalOpen} onClose={() => setIsCloseModalOpen(false)} title="Clôturer la session de caisse">
+                <div className="space-y-4">
+                    <p>Comptez l'argent dans votre tiroir-caisse et entrez le montant total.</p>
+                     <div className="bg-background p-3 rounded-lg text-center">
+                        <p className="text-text-secondary">Montant théorique attendu</p>
+                        <p className="text-3xl font-bold text-accent">{formatCurrency(sessionSummary?.expectedCash || 0)}</p>
+                    </div>
+                    <Input label="Montant total compté (FCFA)" id="closingBalance" type="number" value={closingBalance} onChange={e => setClosingBalance(Number(e.target.value))} min="0" />
+                </div>
+                 <div className="flex justify-end space-x-2 pt-6">
+                    <Button variant="secondary" onClick={() => setIsCloseModalOpen(false)}>Annuler</Button>
+                    <Button variant="danger" onClick={handleCloseSession}>Clôturer et Générer Rapport</Button>
+                </div>
+            </Modal>
+        </div>
+    );
+};
+
+export default CashierClosingPage;
+
+
