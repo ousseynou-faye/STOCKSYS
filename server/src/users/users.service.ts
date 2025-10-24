@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { FR } from '../common/i18n/fr.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -7,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(q?: any) {
+  async findAll(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -16,7 +17,13 @@ export class UsersService {
       ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
       : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
     const where: any = {};
-    if (q?.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q?.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q?.storeId) {
+      where.storeId = q.storeId;
+    }
     if (q?.username) where.username = { contains: q.username, mode: 'insensitive' };
     const total = await this.prisma.user.count({ where });
     const data = await this.prisma.user.findMany({ where, include: { roles: { select: { id: true } } }, orderBy, skip, take: limit });
@@ -25,7 +32,6 @@ export class UsersService {
 
   async create(data: any) {
     const password = data.password || 'changeme';
-    const bcrypt = await import('bcryptjs');
     const hash = await bcrypt.hash(password, 10);
     let created;
     try {
@@ -53,10 +59,10 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id }, include: { roles: { select: { id: true } } } });
   }
 
-  async remove(id: string) {
+  async remove(id: string): Promise<void> {
     const exists = await this.prisma.user.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(FR.ERR_USER_NOT_FOUND);
     await this.prisma.user.delete({ where: { id } });
-    return { success: true };
+    return;
   }
 }

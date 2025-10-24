@@ -8,6 +8,7 @@ import { apiFetchSales, apiCreateSale, apiFetchProducts, MOCK_STORES, MOCK_USERS
 import { USE_API, STRICT_API } from '../services/apiClient';
 import { apiSales } from '../services/apiSales';
 import { apiProducts } from '../services/apiProducts';
+import { apiStock as apiStockSvc } from '../services/apiStock';
 import { apiStores } from '../services/apiStores';
 import { apiUsers } from '../services/apiUsers';
 import { addPendingSale, getPendingSales, clearPendingSales } from '../services/offlineDb';
@@ -100,6 +101,22 @@ const SaleModal: React.FC<SaleModalProps> = ({ isOpen, onClose }) => {
 
     const [selectedVariation, setSelectedVariation] = useState<string>('');
     const [quantity, setQuantity] = useState<number>(1);
+    const [currentStockQty, setCurrentStockQty] = useState<number | null>(null);
+
+    useEffect(() => {
+        const loadStock = async () => {
+            setCurrentStockQty(null);
+            if (!USE_API || !user || !user.storeId || !selectedVariation) return;
+            try {
+                const res: any = await apiStockSvc.fetchStock({ storeId: user.storeId, variationId: selectedVariation, limit: 1 });
+                const arr: any[] = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+                setCurrentStockQty(arr.length ? Number(arr[0].quantity) : 0);
+            } catch {
+                setCurrentStockQty(null);
+            }
+        };
+        loadStock();
+    }, [selectedVariation, user]);
 
     const addToCart = () => {
         if (!selectedVariation || quantity <= 0) return;
@@ -140,7 +157,11 @@ const SaleModal: React.FC<SaleModalProps> = ({ isOpen, onClose }) => {
             addToast({ message: 'Vente enregistrée.', type: 'success' });
             onClose();
         } catch (e: any) {
-            addToast({ message: e?.message || 'Echec de la vente', type: 'error' });
+            const raw = e?.message || '';
+            let friendly = raw;
+            if (/insuffisant/i.test(raw)) friendly = 'Stock insuffisant pour au moins un article dans votre boutique.';
+            if (/Variation not found|introuvable/i.test(raw)) friendly = "L'article sélectionné est invalide. Veuillez réessayer.";
+            addToast({ message: friendly || 'Échec de la vente', type: 'error' });
         }
     };
 
@@ -153,6 +174,13 @@ const SaleModal: React.FC<SaleModalProps> = ({ isOpen, onClose }) => {
                     <Button onClick={addToCart}>Ajouter</Button>
                 </div>
 
+                {selectedVariation && currentStockQty !== null && currentStockQty <= 0 && (
+                    <div className="p-3 rounded bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 text-sm">
+                        Stock insuffisant pour cet article dans votre boutique. Vous pouvez
+                        {' '}<a className="underline" href="#/purchases">réceptionner une commande</a>
+                        {' '}ou{' '}<a className="underline" href="#/stock">ajuster le stock</a>.
+                    </div>
+                )}
                 <div className="bg-surface rounded-lg border border-secondary/40">
                     <table className="w-full text-left">
                         <thead>
@@ -214,6 +242,8 @@ const SalesPage: React.FC = () => {
     const [filters, setFilters] = useState({ storeId: user?.storeId || '', status: '', date: '' });
     const [stores, setStores] = useState<any[]>([]);
     const [users, setUsers] = useState<any[]>([]);
+    const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+    const [returnSale, setReturnSale] = useState<Sale | null>(null);
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -319,6 +349,25 @@ const SalesPage: React.FC = () => {
         'Caissier': s.userName, 'Montant (FCFA)': s.totalAmount, 'Statut': s.status,
     }));
     
+    // Add return action column if permitted
+    const tableColumns = useMemo(() => {
+        const base: any[] = columns as any[];
+        if (hasPermission(Permission.MANAGE_RETURNS)) {
+            return [
+                ...base,
+                {
+                    header: 'Actions',
+                    accessor: (item: any) => (
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="secondary" onClick={() => { /* open return modal */ setReturnSale(item); setIsReturnModalOpen(true); }}>Retour</Button>
+                        </div>
+                    )
+                }
+            ];
+        }
+        return base;
+    }, [columns, hasPermission]);
+    
     
 
     return (
@@ -334,11 +383,104 @@ const SalesPage: React.FC = () => {
                 </div>
             </div>
             <Card>
-                 <Table columns={columns} data={enrichedSales} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} onPageChange={setCurrentPage} serverMode={USE_API} totalItems={USE_API ? (serverTotal + pendingSales.length) : undefined} />
+                 <Table columns={tableColumns as any} data={enrichedSales} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} onPageChange={setCurrentPage} serverMode={USE_API} totalItems={USE_API ? (serverTotal + pendingSales.length) : undefined} />
             </Card>
             {isSaleModalOpen && <SaleModal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} />}
+            {isReturnModalOpen && returnSale && (
+                <ReturnModal sale={returnSale} isOpen={isReturnModalOpen} onClose={() => { setIsReturnModalOpen(false); setReturnSale(null); setRefreshKey(k => k + 1); }} />
+            )}
         </div>
     );
 };
 
 export default SalesPage;
+
+// --- Return Modal ---
+const ReturnModal: React.FC<{ sale: Sale; isOpen: boolean; onClose: () => void }> = ({ sale, isOpen, onClose }) => {
+    const { addToast } = useToast();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [items, setItems] = useState<{ variationId: string; quantity: number }[]>([]);
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                if (USE_API) {
+                    const res: any = await apiProducts.fetchProducts({ limit: 500 });
+                    const arr = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+                    setProducts(arr as any);
+                } else {
+                    setProducts(apiFetchProducts());
+                }
+            } catch {
+                setProducts(STRICT_API ? [] : apiFetchProducts());
+            }
+        };
+        load();
+    }, []);
+
+    const variationOptions = useMemo(() => {
+        const opts: { value: string; label: string }[] = [];
+        products.forEach((p) => {
+            if (p.variations && p.variations.length > 0) {
+                p.variations.forEach((v) => {
+                    const label = `${p.name}${Object.keys(v.attributes || {}).length ? ' (' + Object.values(v.attributes).join(' / ') + ')' : ''}${v.sku ? ' [' + v.sku + ']' : ''}`;
+                    opts.push({ value: v.id, label });
+                });
+            } else {
+                const label = `${p.name}${p.sku ? ' [' + p.sku + ']' : ''}`;
+                opts.push({ value: p.id, label });
+            }
+        });
+        return opts;
+    }, [products]);
+
+    const addItem = () => setItems(prev => [...prev, { variationId: '', quantity: 1 }]);
+    const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+    const updateItem = (idx: number, patch: Partial<{ variationId: string; quantity: number }>) =>
+        setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+
+    const submit = async () => {
+        try {
+            const payload = items
+                .filter(it => it.variationId && Number(it.quantity) > 0)
+                .map(it => ({ variationId: it.variationId, quantity: Number(it.quantity) }));
+            if (payload.length === 0) { addToast({ message: 'Ajoutez au moins un article valide.', type: 'error' }); return; }
+            await apiSales.returnItems(sale.id, payload);
+            addToast({ message: 'Retour enregistré.', type: 'success' });
+            onClose();
+        } catch (e: any) {
+            addToast({ message: e?.message || 'Échec du retour.', type: 'error' });
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Retour pour vente #${sale.id.slice(-6).toUpperCase()}`}>
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div className="text-sm text-text-secondary">Boutique: <span className="font-semibold">{sale.storeId}</span></div>
+                    <Button size="sm" variant="secondary" onClick={addItem}>Ajouter un article</Button>
+                </div>
+                <div className="space-y-3">
+                    {items.map((it, idx) => (
+                        <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                            <div className="md:col-span-8">
+                                <Select id={`ret-var-${idx}`} label="Article (variation)" value={it.variationId} onChange={e => updateItem(idx, { variationId: e.target.value })} options={[{ value: '', label: 'Sélectionner...' }, ...variationOptions]} />
+                            </div>
+                            <div className="md:col-span-3">
+                                <Input id={`ret-qty-${idx}`} label="Quantité" type="number" min={1} value={it.quantity} onChange={e => updateItem(idx, { quantity: Number(e.target.value) })} />
+                            </div>
+                            <div className="md:col-span-1">
+                                <Button variant="danger" size="sm" onClick={() => removeItem(idx)}><TrashIcon className="w-4 h-4" /></Button>
+                            </div>
+                        </div>
+                    ))}
+                    {items.length === 0 && <p className="text-sm text-text-secondary">Aucun article. Cliquez sur "Ajouter un article".</p>}
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="secondary" onClick={onClose}>Annuler</Button>
+                    <Button onClick={submit}>Enregistrer</Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};

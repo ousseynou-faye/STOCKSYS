@@ -2,6 +2,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Generate into server/.prisma so @prisma/client forwards types correctly
+  output   = "../server/node_modules/.prisma/client"
 }
 
 datasource db {
@@ -131,23 +133,24 @@ enum AuditActionType {
 // ==========================
 
 model User {
-  id                String   @id @default(cuid())
-  username          String   @unique
+  id                String     @id @default(cuid())
+  username          String     @unique
   passwordHash      String
   profilePictureUrl String?
   storeId           String?
-  store             Store?   @relation(fields: [storeId], references: [id])
+  store             Store?     @relation(fields: [storeId], references: [id])
   roles             Role[]
   auditLogs         AuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sales     Sale[]
-  cashierSessions CashierSession[]
-  inventorySessions InventorySession[]
-  expenses Expense[]
+  sales                 Sale[]
+  cashierSessions       CashierSession[]
+  inventorySessions     InventorySession[]
+  expenses              Expense[]
   purchaseOrdersCreated PurchaseOrder[]
+  saleReturns           SaleReturn[]
 }
 
 model Role {
@@ -164,15 +167,16 @@ model Store {
   id   String @id @default(cuid())
   name String
 
-  users         User[]
-  stocks        ProductStock[]
-  sales         Sale[]
-  purchases     PurchaseOrder[]
-  expenses      Expense[]
-  notifications Notification[]
-  settings      Setting[]
+  users           User[]
+  stocks          ProductStock[]
+  sales           Sale[]
+  purchases       PurchaseOrder[]
+  expenses        Expense[]
+  notifications   Notification[]
+  settings        Setting[]
   cashierSessions CashierSession[]
-  inventories   InventorySession[]
+  inventories     InventorySession[]
+  saleReturns     SaleReturn[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -191,17 +195,17 @@ model Category {
 }
 
 model Product {
-  id                 String       @id @default(cuid())
-  name               String
-  type               ProductType
-  lowStockThreshold  Int          @default(0)
-  sku                String?      @unique
-  price              Float?
-  categoryId         String
-  category           Category     @relation(fields: [categoryId], references: [id])
+  id                String      @id @default(cuid())
+  name              String
+  type              ProductType
+  lowStockThreshold Int         @default(0)
+  sku               String?     @unique
+  price             Float?
+  categoryId        String
+  category          Category    @relation(fields: [categoryId], references: [id])
 
-  variations         ProductVariation[]
-  bundleComponents   BundleComponent[] @relation("Bundle_Product")
+  variations       ProductVariation[]
+  bundleComponents BundleComponent[]  @relation("Bundle_Product")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -218,13 +222,14 @@ model ProductVariation {
   productId  String
   product    Product @relation(fields: [productId], references: [id])
 
-  bundleComponents BundleComponent[] @relation("Component_Variation")
-  stocks           ProductStock[]
-  saleItems        SaleItem[]
-  purchaseItems    PurchaseOrderItem[]
-  notifications    Notification[]
-  supplierProducts SupplierProduct[]
+  bundleComponents    BundleComponent[]    @relation("Component_Variation")
+  stocks              ProductStock[]
+  saleItems           SaleItem[]
+  purchaseItems       PurchaseOrderItem[]
+  notifications       Notification[]
+  supplierProducts    SupplierProduct[]
   inventoryCountItems InventoryCountItem[]
+  saleReturnItems     SaleReturnItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -233,26 +238,26 @@ model ProductVariation {
 }
 
 model BundleComponent {
-  id                   Int               @id @default(autoincrement())
+  id                   Int    @id @default(autoincrement())
   bundleProductId      String
   componentVariationId String
   quantity             Int
 
-  bundleProduct  Product          @relation("Bundle_Product", fields: [bundleProductId], references: [id])
-  component      ProductVariation @relation("Component_Variation", fields: [componentVariationId], references: [id])
+  bundleProduct Product          @relation("Bundle_Product", fields: [bundleProductId], references: [id])
+  component     ProductVariation @relation("Component_Variation", fields: [componentVariationId], references: [id])
 
+  @@unique([bundleProductId, componentVariationId])
   @@index([bundleProductId])
   @@index([componentVariationId])
-  @@unique([bundleProductId, componentVariationId])
 }
 
 model ProductStock {
-  id          String          @id @default(cuid())
+  id          String @id @default(cuid())
   quantity    Int
   storeId     String
   variationId String
 
-  store     Store           @relation(fields: [storeId], references: [id])
+  store     Store            @relation(fields: [storeId], references: [id])
   variation ProductVariation @relation(fields: [variationId], references: [id])
 
   createdAt DateTime @default(now())
@@ -271,11 +276,12 @@ model Sale {
 
   userId  String
   storeId String
-  user    User @relation(fields: [userId], references: [id])
-  store   Store @relation(fields: [storeId], references: [id])
+  user    User   @relation(fields: [userId], references: [id])
+  store   Store  @relation(fields: [storeId], references: [id])
 
   items    SaleItem[]
   payments Payment[]
+  returns  SaleReturn[]
 
   @@index([createdAt])
   @@index([storeId])
@@ -283,14 +289,14 @@ model Sale {
 }
 
 model SaleItem {
-  id           Int     @id @default(autoincrement())
-  quantity     Int
-  priceAtSale  Float
+  id          Int   @id @default(autoincrement())
+  quantity    Int
+  priceAtSale Float
 
-  saleId       String
-  variationId  String
-  sale         Sale            @relation(fields: [saleId], references: [id])
-  variation    ProductVariation @relation(fields: [variationId], references: [id])
+  saleId      String
+  variationId String
+  sale        Sale             @relation(fields: [saleId], references: [id])
+  variation   ProductVariation @relation(fields: [variationId], references: [id])
 
   @@index([saleId])
   @@index([variationId])
@@ -303,9 +309,43 @@ model Payment {
   createdAt DateTime      @default(now())
 
   saleId String
-  sale   Sale @relation(fields: [saleId], references: [id])
+  sale   Sale   @relation(fields: [saleId], references: [id])
 
   @@index([saleId])
+}
+
+// ==========================
+// Sales Returns
+// ==========================
+
+model SaleReturn {
+  id        String   @id @default(cuid())
+  saleId    String
+  storeId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  sale  Sale             @relation(fields: [saleId], references: [id])
+  store Store            @relation(fields: [storeId], references: [id])
+  user  User             @relation(fields: [userId], references: [id])
+  items SaleReturnItem[]
+
+  @@index([saleId])
+  @@index([storeId])
+  @@index([userId])
+}
+
+model SaleReturnItem {
+  id          Int    @id @default(autoincrement())
+  returnId    String
+  variationId String
+  quantity    Int
+
+  return    SaleReturn       @relation(fields: [returnId], references: [id])
+  variation ProductVariation @relation(fields: [variationId], references: [id])
+
+  @@index([returnId])
+  @@index([variationId])
 }
 
 // ==========================
@@ -313,17 +353,17 @@ model Payment {
 // ==========================
 
 model Supplier {
-  id          String  @id @default(cuid())
-  name        String
+  id            String  @id @default(cuid())
+  name          String
   contactPerson String?
-  email       String?
-  phone       String?
-  address     String?
-  paymentTerms String?
-  extra       Json?
+  email         String?
+  phone         String?
+  address       String?
+  paymentTerms  String?
+  extra         Json?
 
   purchaseOrders PurchaseOrder[]
-  products        SupplierProduct[]
+  products       SupplierProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -332,19 +372,19 @@ model Supplier {
 }
 
 model PurchaseOrder {
-  id          String               @id @default(cuid())
+  id          String              @id @default(cuid())
   supplierId  String
   storeId     String
-  status      PurchaseOrderStatus  @default(DRAFT)
-  totalAmount Float                @default(0)
-  createdAt   DateTime             @default(now())
+  status      PurchaseOrderStatus @default(DRAFT)
+  totalAmount Float               @default(0)
+  createdAt   DateTime            @default(now())
   receivedAt  DateTime?
   createdById String?
 
-  supplier Supplier @relation(fields: [supplierId], references: [id])
-  store    Store    @relation(fields: [storeId], references: [id])
-  createdBy User?   @relation(fields: [createdById], references: [id])
-  items    PurchaseOrderItem[]
+  supplier  Supplier            @relation(fields: [supplierId], references: [id])
+  store     Store               @relation(fields: [storeId], references: [id])
+  createdBy User?               @relation(fields: [createdById], references: [id])
+  items     PurchaseOrderItem[]
 
   @@index([supplierId])
   @@index([storeId])
@@ -352,14 +392,14 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id              Int      @id @default(autoincrement())
-  purchaseOrderId String
-  variationId     String
-  quantity        Int
-  price           Float
-  receivedQuantity Int     @default(0)
+  id               Int    @id @default(autoincrement())
+  purchaseOrderId  String
+  variationId      String
+  quantity         Int
+  price            Float
+  receivedQuantity Int    @default(0)
 
-  purchaseOrder PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id])
   variation     ProductVariation @relation(fields: [variationId], references: [id])
 
   @@index([purchaseOrderId])
@@ -367,13 +407,13 @@ model PurchaseOrderItem {
 }
 
 model Expense {
-  id         String   @id @default(cuid())
-  userId     String
-  storeId    String
-  category   String
+  id          String   @id @default(cuid())
+  userId      String
+  storeId     String
+  category    String
   description String
-  amount     Float
-  createdAt  DateTime @default(now())
+  amount      Float
+  createdAt   DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
   store Store @relation(fields: [storeId], references: [id])
@@ -388,15 +428,15 @@ model Expense {
 // ==========================
 
 model InventorySession {
-  id         String                 @id @default(cuid())
-  storeId    String
-  userId     String
-  status     InventorySessionStatus @default(IN_PROGRESS)
-  createdAt  DateTime               @default(now())
+  id          String                 @id @default(cuid())
+  storeId     String
+  userId      String
+  status      InventorySessionStatus @default(IN_PROGRESS)
+  createdAt   DateTime               @default(now())
   completedAt DateTime?
 
-  store Store @relation(fields: [storeId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
+  store Store                @relation(fields: [storeId], references: [id])
+  user  User                 @relation(fields: [userId], references: [id])
   items InventoryCountItem[]
 
   @@index([storeId])
@@ -405,7 +445,7 @@ model InventorySession {
 }
 
 model InventoryCountItem {
-  id                  Int     @id @default(autoincrement())
+  id                  Int    @id @default(autoincrement())
   sessionId           String
   variationId         String
   theoreticalQuantity Int
@@ -414,22 +454,22 @@ model InventoryCountItem {
   session   InventorySession @relation(fields: [sessionId], references: [id])
   variation ProductVariation @relation(fields: [variationId], references: [id])
 
+  @@unique([sessionId, variationId])
   @@index([sessionId])
   @@index([variationId])
-  @@unique([sessionId, variationId])
 }
 
 model CashierSession {
-  id              String   @id @default(cuid())
-  userId          String
-  storeId         String
-  startedAt       DateTime @default(now())
-  endedAt         DateTime?
-  openingBalance  Float
-  closingBalance  Float?
+  id               String    @id @default(cuid())
+  userId           String
+  storeId          String
+  startedAt        DateTime  @default(now())
+  endedAt          DateTime?
+  openingBalance   Float
+  closingBalance   Float?
   theoreticalSales Json?
-  difference      Float?
-  createdAt       DateTime @default(now())
+  difference       Float?
+  createdAt        DateTime  @default(now())
 
   user  User  @relation(fields: [userId], references: [id])
   store Store @relation(fields: [storeId], references: [id])
@@ -467,11 +507,11 @@ model AuditLog {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  type        NotificationType
-  message     String
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String           @id @default(cuid())
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
 
   storeId     String?
   variationId String?
@@ -484,11 +524,11 @@ model Notification {
 }
 
 model Setting {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   key     String
   value   Json
   storeId String?
-  store   Store? @relation(fields: [storeId], references: [id])
+  store   Store?  @relation(fields: [storeId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -499,13 +539,13 @@ model Setting {
 
 // Supplier catalogue (variation-level)
 model SupplierProduct {
-  id           String           @id @default(cuid())
-  supplierId   String
-  variationId  String
+  id            String @id @default(cuid())
+  supplierId    String
+  variationId   String
   purchasePrice Float
-  supplierSku  String
+  supplierSku   String
 
-  supplier Supplier        @relation(fields: [supplierId], references: [id])
+  supplier  Supplier         @relation(fields: [supplierId], references: [id])
   variation ProductVariation @relation(fields: [variationId], references: [id])
 
   @@unique([supplierId, variationId])

@@ -104,9 +104,13 @@ async function main() {
       permissions: [
         PERM.VIEW_DASHBOARD_STATS, PERM.CREATE_SALE, PERM.VIEW_SALES_HISTORY,
         PERM.VIEW_STOCK, PERM.MANAGE_STOCK, PERM.MANAGE_STOCK_TRANSFERS, PERM.PERFORM_INVENTORY,
+        // Returns management
+        PERM.MANAGE_RETURNS,
         PERM.VIEW_PURCHASES, PERM.CREATE_PURCHASE_ORDER, PERM.MANAGE_PURCHASE_ORDERS,
         PERM.VIEW_SUPPLIERS, PERM.MANAGE_SUPPLIERS, PERM.VIEW_EXPENSES, PERM.MANAGE_EXPENSES,
         PERM.VIEW_REPORTS,
+        // Categories
+        PERM.VIEW_CATEGORIES, PERM.MANAGE_CATEGORIES,
         // Stores visibility for filters/transfers
         PERM.VIEW_STORES,
         // Basic user visibility (for reports filters)
@@ -130,6 +134,12 @@ async function main() {
     prisma.user.create({ data: { username: 'cashier1', passwordHash: pass, storeId: stores[0].id, roles: { connect: [{ id: roleCashier.id }] } } }),
     prisma.user.create({ data: { username: 'cashier2', passwordHash: pass, storeId: stores[1].id, roles: { connect: [{ id: roleCashier.id }] } } }),
   ]);
+
+  // Notifications de démonstration
+  await prisma.notification.createMany({ data: [
+    { type: 'ALERT', message: 'Bienvenue sur StockSys 👋', storeId: stores[0].id },
+    { type: 'SALE', message: "Une première vente a été enregistrée.", storeId: stores[0].id },
+  ]});
 
   const categories = await prisma.$transaction([
     prisma.category.create({ data: { name: 'Câbles' } }),

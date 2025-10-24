@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class ExpensesService {
   constructor(private prisma: PrismaService) {}
 
-  async list(q?: any) {
+  async list(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -16,7 +16,13 @@ export class ExpensesService {
       ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
       : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
     const where: any = {};
-    if (q?.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q?.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q?.storeId) {
+      where.storeId = q.storeId;
+    }
     if (q?.category) where.category = q.category;
     if (q?.date) where.createdAt = { gte: new Date(q.date), lt: new Date(q.date + 'T23:59:59.999Z') } as any;
     const total = await this.prisma.expense.count({ where });
@@ -38,10 +44,10 @@ export class ExpensesService {
     if (!exists) throw new NotFoundException(FR.ERR_EXPENSE_NOT_FOUND);
     return this.prisma.expense.update({ where: { id }, data });
   }
-  async remove(id: string) {
+  async remove(id: string): Promise<void> {
     const exists = await this.prisma.expense.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(FR.ERR_EXPENSE_NOT_FOUND);
     await this.prisma.expense.delete({ where: { id } });
-    return { success: true };
+    return;
   }
 }

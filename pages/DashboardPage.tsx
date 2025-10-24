@@ -60,7 +60,7 @@ const AdminManagerDashboard: React.FC = () => {
             setIsLoading(true);
             try {
                 if (USE_API) {
-                    const [sr, er, st, storesRes, tv, prods, cats] = await Promise.all([
+                    const [sr, er, st, storesRes, tv, prods] = await Promise.all([
                         apiReports.sales({ startDate: filterStartDate || undefined, endDate: filterEndDate || undefined, storeId: filterStoreId || undefined }) as any,
                         apiReports.expenses({ startDate: filterStartDate || undefined, endDate: filterEndDate || undefined, storeId: filterStoreId || undefined }) as any,
                         apiStockSvc.fetchStock(filterStoreId ? { storeId: filterStoreId } : undefined) as any,
@@ -68,7 +68,6 @@ const AdminManagerDashboard: React.FC = () => {
                         apiReports.topVariations({ startDate: filterStartDate || undefined, endDate: filterEndDate || undefined, storeId: filterStoreId || undefined, limit: 5 }) as any,
                         // Lightweight lists for name lookups and charts
                         apiProducts.fetchProducts({ limit: 200 }).catch(() => (STRICT_API ? [] : MOCK_PRODUCTS) as any),
-                        apiCategories.fetchCategories().catch(() => (STRICT_API ? [] : MOCK_CATEGORIES) as any),
                     ]);
 
                     const salesNorm: Sale[] = (sr as any[]).map((r: any) => ({
@@ -98,8 +97,18 @@ const AdminManagerDashboard: React.FC = () => {
                     setStores(((storesRes as any)?.data) || (storesRes as any));
                     const prodArr: any[] = ((prods as any)?.data) || (prods as any) || [];
                     setProducts(prodArr as any);
-                    const catArr: any[] = ((cats as any)?.data) || (cats as any) || [];
-                    setCategories(catArr as any);
+                    // Load categories only if permitted, to avoid 403 global errors
+                    if (hasPermission(Permission.VIEW_CATEGORIES)) {
+                        try {
+                            const ct: any = await apiCategories.fetchCategories();
+                            const catArr: any[] = ((ct as any)?.data) || (ct as any) || [];
+                            setCategories(catArr as any);
+                        } catch {
+                            setCategories(STRICT_API ? [] : (MOCK_CATEGORIES as any));
+                        }
+                    } else {
+                        setCategories([] as any);
+                    }
                     setTopVariations(Array.isArray(tv) ? (tv as any) : []);
                 } else {
                     await new Promise(res => setTimeout(res, 500));

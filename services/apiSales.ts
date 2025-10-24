@@ -32,4 +32,6 @@ export const apiSales = {
     }));
     return api.post('/sales/bulk', { sales: mapped });
   },
+  returnItems: (saleId: string, items: { variationId: string; quantity: number }[]) =>
+    api.post(`/sales/${saleId}/returns`, { items }),
 };

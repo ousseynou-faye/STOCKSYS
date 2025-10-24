@@ -11,11 +11,15 @@ function parseDateISO(d?: string) {
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  async salesReport(q: any) {
+  async salesReport(q: any, user?: any) {
     const startDate = parseDateISO(q.startDate);
     const endDate = parseDateISO(q.endDate);
     const where: any = {};
-    if (q.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q.storeId) { where.storeId = q.storeId; }
     if (q.userId) where.userId = q.userId;
     // Optional product/category filters at item level
     const itemFilter: any = { AND: [] as any[] };
@@ -29,14 +33,47 @@ export class ReportsService {
       where.createdAt = { ...(where.createdAt || {}), lt: end };
     }
     const sales = await this.prisma.sale.findMany({ where, orderBy: { createdAt: 'desc' }, include: { items: true } });
-    return sales.map((s, index) => ({
-      id: `${s.id}-${index}`,
-      date: s.createdAt,
-      storeId: s.storeId,
-      userId: s.userId,
-      itemCount: s.items.reduce((sum, it) => sum + it.quantity, 0),
-      totalAmount: s.totalAmount,
-    }));
+
+    // Map average sale price per variation for each sale
+    const toAvgMap = (s: any) => {
+      const agg: Record<string, { qty: number; amount: number }> = {};
+      for (const it of s.items) {
+        agg[it.variationId] = agg[it.variationId] || { qty: 0, amount: 0 };
+        agg[it.variationId].qty += it.quantity;
+        agg[it.variationId].amount += it.quantity * it.priceAtSale;
+      }
+      const avg = new Map<string, number>();
+      Object.entries(agg).forEach(([vId, a]) => avg.set(vId, a.qty > 0 ? a.amount / a.qty : 0));
+      return avg;
+    };
+
+    // Load returns for these sales
+    const saleIds = sales.map(s => s.id);
+    const returns = saleIds.length
+      ? await this.prisma.saleReturn.findMany({ where: { saleId: { in: saleIds } }, include: { items: true } })
+      : [];
+    const returnedBySale = new Map<string, Record<string, number>>();
+    for (const r of returns) {
+      const m = returnedBySale.get(r.saleId) || {};
+      for (const it of (r.items as any[])) {
+        m[it.variationId] = (m[it.variationId] || 0) + it.quantity;
+      }
+      returnedBySale.set(r.saleId, m);
+    }
+
+    return sales.map((s, index) => {
+      const avgMap = toAvgMap(s as any);
+      const ret = returnedBySale.get(s.id) || {};
+      const returnedAmount = Object.entries(ret).reduce((sum, [vId, qty]) => sum + (avgMap.get(vId) || 0) * (qty as number), 0);
+      return {
+        id: `${s.id}-${index}`,
+        date: s.createdAt,
+        storeId: s.storeId,
+        userId: s.userId,
+        itemCount: s.items.reduce((sum, it) => sum + it.quantity, 0),
+        totalAmount: Math.max(0, s.totalAmount - returnedAmount),
+      };
+    });
   }
 
   async getPurchasePriceForVariation(variationId: string): Promise<number | null> {
@@ -44,8 +81,9 @@ export class ReportsService {
     return sp.length ? sp[0].purchasePrice : null;
   }
 
-  async stockValuationReport(storeId?: string) {
-    const stock = await this.prisma.productStock.findMany({ where: { ...(storeId ? { storeId } : {}) } });
+  async stockValuationReport(storeId?: string, user?: any) {
+    const scopedStoreId = ((user?.permissions || []).includes('MANAGE_ROLES')) ? (storeId || '') : (user?.storeId || storeId || '');
+    const stock = await this.prisma.productStock.findMany({ where: { ...(scopedStoreId ? { storeId: scopedStoreId } : {}) } });
     const variations = await this.prisma.productVariation.findMany({ where: { id: { in: Array.from(new Set(stock.map(s => s.variationId))) } }, include: { product: true } });
     const varMap = new Map(variations.map(v => [v.id, v]));
     const out: any[] = [];
@@ -64,32 +102,71 @@ export class ReportsService {
     return out;
   }
 
-  async profitabilityReport(q: any) {
+  async profitabilityReport(q: any, user?: any) {
     const startDate = parseDateISO(q.startDate);
     const endDate = parseDateISO(q.endDate);
     const where: any = {};
-    if (q.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q.storeId) { where.storeId = q.storeId; }
     if (startDate) where.createdAt = { ...(where.createdAt || {}), gte: startDate };
     if (endDate) { const end = new Date(endDate); end.setDate(end.getDate() + 1); where.createdAt = { ...(where.createdAt || {}), lt: end }; }
     const sales = await this.prisma.sale.findMany({ where, include: { items: true } });
+
+    // Returns per sale
+    const saleIds = sales.map(s => s.id);
+    const returns = saleIds.length
+      ? await this.prisma.saleReturn.findMany({ where: { saleId: { in: saleIds } }, include: { items: true } })
+      : [];
+    const returnedBySale = new Map<string, Record<string, number>>();
+    for (const r of returns) {
+      const m = returnedBySale.get(r.saleId) || {};
+      for (const it of (r.items as any[])) m[it.variationId] = (m[it.variationId] || 0) + it.quantity;
+      returnedBySale.set(r.saleId, m);
+    }
+
     return Promise.all(sales.map(async (s) => {
-      const revenue = s.totalAmount;
+      // Revenue net of returns
+      const avgMap = new Map<string, number>();
+      const agg: Record<string, { qty: number; amount: number }> = {};
+      for (const it of s.items as any[]) {
+        agg[it.variationId] = agg[it.variationId] || { qty: 0, amount: 0 };
+        agg[it.variationId].qty += it.quantity;
+        agg[it.variationId].amount += it.quantity * it.priceAtSale;
+      }
+      Object.entries(agg).forEach(([vId, a]) => avgMap.set(vId, a.qty > 0 ? a.amount / a.qty : 0));
+      const ret = returnedBySale.get(s.id) || {};
+      const returnedAmount = Object.entries(ret).reduce((sum, [vId, qty]) => sum + (avgMap.get(vId) || 0) * (qty as number), 0);
+      const revenue = Math.max(0, s.totalAmount - returnedAmount);
+
+      // Cost net of returns (remove cost of returned quantities at purchase price)
       let cost = 0;
       for (const it of s.items) {
         const pp = (await this.getPurchasePriceForVariation(it.variationId)) ?? it.priceAtSale;
         cost += pp * it.quantity;
       }
+      for (const [vId, qty] of Object.entries(ret)) {
+        const pp = (await this.getPurchasePriceForVariation(vId)) ?? (avgMap.get(vId) || 0);
+        cost -= pp * (qty as number);
+      }
+
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
       return { id: s.id, date: s.createdAt, storeId: s.storeId, revenue, cost, profit, margin };
     }));
   }
 
-  async expensesReport(q: any) {
+  async expensesReport(q: any, user?: any) {
     const startDate = parseDateISO(q.startDate);
     const endDate = parseDateISO(q.endDate);
     const where: any = {};
-    if (q.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q.storeId) { where.storeId = q.storeId; }
     if (q.expenseCategory) where.category = q.expenseCategory;
     if (startDate) where.createdAt = { ...(where.createdAt || {}), gte: startDate };
     if (endDate) { const end = new Date(endDate); end.setDate(end.getDate() + 1); where.createdAt = { ...(where.createdAt || {}), lt: end }; }
@@ -97,12 +174,16 @@ export class ReportsService {
     return exps.map(e => ({ id: e.id, date: e.createdAt, storeId: e.storeId, category: e.category, description: e.description, amount: e.amount }));
   }
 
-  async topProductsReport(q: any) {
+  async topProductsReport(q: any, user?: any) {
     const startDate = parseDateISO(q.startDate);
     const endDate = parseDateISO(q.endDate);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '5', 10) || 5, 1), 50);
     const whereSale: any = {};
-    if (q.storeId) whereSale.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q.storeId) whereSale.storeId = q.storeId;
+    } else if (user?.storeId) {
+      whereSale.storeId = user.storeId;
+    } else if (q.storeId) { whereSale.storeId = q.storeId; }
     if (startDate) whereSale.createdAt = { ...(whereSale.createdAt || {}), gte: startDate };
     if (endDate) { const end = new Date(endDate); end.setDate(end.getDate() + 1); whereSale.createdAt = { ...(whereSale.createdAt || {}), lt: end }; }
 
@@ -121,12 +202,16 @@ export class ReportsService {
     return Array.from(agg.values()).sort((a, b) => b.ventes - a.ventes).slice(0, limit);
   }
 
-  async topVariationsReport(q: any) {
+  async topVariationsReport(q: any, user?: any) {
     const startDate = parseDateISO(q.startDate);
     const endDate = parseDateISO(q.endDate);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '5', 10) || 5, 1), 50);
     const whereSale: any = {};
-    if (q.storeId) whereSale.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q.storeId) whereSale.storeId = q.storeId;
+    } else if (user?.storeId) {
+      whereSale.storeId = user.storeId;
+    } else if (q.storeId) { whereSale.storeId = q.storeId; }
     if (startDate) whereSale.createdAt = { ...(whereSale.createdAt || {}), gte: startDate };
     if (endDate) { const end = new Date(endDate); end.setDate(end.getDate() + 1); whereSale.createdAt = { ...(whereSale.createdAt || {}), lt: end }; }
 

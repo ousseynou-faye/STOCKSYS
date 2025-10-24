@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { PermissionsGuard } from '../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../common/decorators/permissions.decorator.js';
@@ -13,7 +13,7 @@ export class ExpensesController {
 
   @RequirePermissions('VIEW_EXPENSES')
   @Get()
-  list(@Query() q: any) { return this.service.list(q); }
+  list(@Req() req: any, @Query() q: any) { return this.service.list(q, req.user); }
 
   @RequirePermissions('MANAGE_EXPENSES')
   @Post()

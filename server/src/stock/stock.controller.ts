@@ -13,7 +13,7 @@ export class StockController {
 
   @RequirePermissions('VIEW_STOCK')
   @Get()
-  list(@Query() q: any) { return this.service.list(q); }
+  list(@Req() req: any, @Query() q: any) { return this.service.list(q, req.user); }
 
   @RequirePermissions('MANAGE_STOCK')
   @Patch('adjust')

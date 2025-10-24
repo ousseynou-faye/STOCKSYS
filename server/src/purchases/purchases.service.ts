@@ -6,7 +6,7 @@ import { AuditNotifyService } from '../common/services/audit-notify.service.js';
 export class PurchasesService {
   constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
 
-    async list(q?: any) {
+    async list(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -15,16 +15,25 @@ export class PurchasesService {
       ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
       : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
     const where: any = {};
-    if (q?.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q?.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q?.storeId) {
+      where.storeId = q.storeId;
+    }
     if (q?.supplierId) where.supplierId = q.supplierId;
     if (q?.status) where.status = q.status;
     const total = await this.prisma.purchaseOrder.count({ where });
     const data = await this.prisma.purchaseOrder.findMany({ where, include: { items: true }, orderBy, skip, take: limit });
     return { data, meta: { page, limit, total } };
   }
-  async create(po: any) {
+  async create(po: any, user?: any) {
     if (!po || !po.supplierId || !po.storeId) {
       throw new BadRequestException('Fournisseur et boutique sont requis');
+    }
+    if (!((user?.permissions || []).includes('MANAGE_ROLES')) && user?.storeId && po.storeId !== user.storeId) {
+      throw new BadRequestException('Vous ne pouvez créer des commandes que pour votre boutique.');
     }
     const supplier = await this.prisma.supplier.findUnique({ where: { id: po.supplierId } });
     if (!supplier) throw new BadRequestException('Fournisseur introuvable');
@@ -66,9 +75,12 @@ export class PurchasesService {
 
     return this.prisma.purchaseOrder.create({ data });
   }
-  async update(id: string, po: any) {
+  async update(id: string, po: any, user?: any) {
     const current = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
     if (!current) throw new BadRequestException('Commande introuvable');
+    if (!((user?.permissions || []).includes('MANAGE_ROLES')) && user?.storeId && current.storeId !== user.storeId) {
+      throw new BadRequestException('Vous ne pouvez modifier que les commandes de votre boutique.');
+    }
 
     const allowed = new Set(['DRAFT','PENDING','ORDERED','PARTIALLY_RECEIVED','RECEIVED','CANCELLED']);
     if (po.status && !allowed.has(po.status)) throw new BadRequestException('Statut invalide');
@@ -95,12 +107,31 @@ export class PurchasesService {
       throw new BadRequestException(`Transition ${current.status} -> ${po.status} interdite`);
     }
 
-    return this.prisma.purchaseOrder.update({ where: { id }, data: po });
+    // Ne mettre à jour que les champs autorisés; éviter de passer des structures non supportées à Prisma
+    const { items, totalAmount, createdAt, receivedAt, createdById, ...rest } = po || {};
+    const data: any = {};
+    if (rest.supplierId !== undefined) data.supplierId = rest.supplierId;
+    if (rest.storeId !== undefined) {
+      if (!((user?.permissions || []).includes('MANAGE_ROLES')) && user?.storeId && rest.storeId !== user.storeId) {
+        throw new BadRequestException('Changement de boutique non autorisé.');
+      }
+      data.storeId = rest.storeId;
+    }
+    if (rest.status !== undefined) data.status = rest.status;
+
+    try {
+      return await this.prisma.purchaseOrder.update({ where: { id }, data });
+    } catch (e: any) {
+      throw new BadRequestException(e?.message || 'Mise à jour invalide');
+    }
   }
   async receive(id: string, items: { variationId: string; quantity: number }[], user?: any) {
     return this.prisma.$transaction(async (tx: any) => {
       const po = await tx.purchaseOrder.findUnique({ where: { id }, include: { items: true } });
       if (!po) throw new Error('PO not found');
+      if (!((user?.permissions || []).includes('MANAGE_ROLES')) && user?.storeId && po.storeId !== user.storeId) {
+        throw new BadRequestException('Réception limitée à votre boutique.');
+      }
       if (po.status === 'CANCELLED' || po.status === 'RECEIVED') { throw new BadRequestException('La commande ne permet pas de r�ception.'); }
       for (const it of items) {
         if (!it || typeof it.quantity !== 'number' || it.quantity <= 0) { throw new BadRequestException('Quantit� invalide.'); }

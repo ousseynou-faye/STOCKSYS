@@ -12,15 +12,15 @@ export class PurchasesController {
 
   @RequirePermissions('VIEW_PURCHASES')
   @Get()
-  list(@Query() q: any) { return this.service.list(q); }
+  list(@Req() req: any, @Query() q: any) { return this.service.list(q, req.user); }
 
   @RequirePermissions('CREATE_PURCHASE_ORDER')
   @Post()
-  create(@Body() body: any) { return this.service.create(body); }
+  create(@Req() req: any, @Body() body: any) { return this.service.create(body, req.user); }
 
   @RequirePermissions('MANAGE_PURCHASE_ORDERS')
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any) { return this.service.update(id, body); }
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) { return this.service.update(id, body, req.user); }
 
   @RequirePermissions('MANAGE_PURCHASE_ORDERS')
   @Post(':id/receive')

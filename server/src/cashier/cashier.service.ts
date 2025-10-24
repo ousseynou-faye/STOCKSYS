@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export class CashierService {
   constructor(private prisma: PrismaService) {}
 
-  async list(q?: any) {
+  async list(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -14,8 +14,13 @@ export class CashierService {
       ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
       : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
     const where: any = {};
-    if (q?.storeId) where.storeId = q.storeId;
-    if (q?.userId) where.userId = q.userId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q?.storeId) where.storeId = q.storeId;
+      if (q?.userId) where.userId = q.userId;
+    } else {
+      if (user?.storeId) where.storeId = user.storeId;
+      if (q?.userId) where.userId = q.userId;
+    }
     const total = await this.prisma.cashierSession.count({ where });
     const data = await this.prisma.cashierSession.findMany({ where, orderBy, skip, take: limit });
     return { data, meta: { page, limit, total } };

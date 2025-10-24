@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards, Query, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { PermissionsGuard } from '../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../common/decorators/permissions.decorator.js';
@@ -13,7 +13,7 @@ export class ProductsController {
 
   @RequirePermissions('VIEW_STOCK')
   @Get()
-  findAll(@Query() q: any) { return this.service.findAll(q); }
+  findAll(@Req() req: any, @Query() q: any) { return this.service.findAll(q, req.user); }
 
   @RequirePermissions('MANAGE_STOCK')
   @Post()

@@ -230,6 +230,7 @@ interface POModalProps {
 
 const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseOrder, mode, onSave, suppliers, stores, products }) => {
     const [poData, setPoData] = useState<PurchaseOrder>(purchaseOrder);
+    const [showReceive, setShowReceive] = useState(false);
     const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
     const { user } = useAuth();
     const { addToast } = useToast();
@@ -327,7 +328,36 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
                 <div className="grid grid-cols-3 gap-4 p-4 bg-secondary/30 rounded-lg">
                     <div><span className="font-semibold">Fournisseur:</span> {isEditable ? <Select label="" id="supplierId" value={poData.supplierId} onChange={e => setPoData({...poData, supplierId: e.target.value})} options={suppliers.map(s => ({value: s.id, label: s.name}))}/> : suppliers.find(s => s.id === poData.supplierId)?.name}</div>
                     <div><span className="font-semibold">Boutique:</span> {isEditable ? <Select label="" id="storeId" value={poData.storeId} onChange={e => setPoData({...poData, storeId: e.target.value})} options={stores.map(s => ({value: s.id, label: s.name}))}/> : stores.find(s => s.id === poData.storeId)?.name}</div>
-                    <div><span className="font-semibold">Statut:</span> {isEditable ? <Select label="" id="status" value={poData.status} onChange={e => setPoData({...poData, status: e.target.value as PurchaseOrderStatus})} options={Object.values(PurchaseOrderStatus).map(s => ({value: s, label: s}))}/> : <StatusBadge status={poData.status} />}</div>
+                    <div>
+                      <span className="font-semibold">Statut:</span>
+                      {isEditable ? (
+                        <div>
+                          <Select
+                            label=""
+                            id="status"
+                            value={poData.status}
+                            onChange={e => setPoData({ ...poData, status: e.target.value as PurchaseOrderStatus })}
+                            options={(() => {
+                              const allowed: Record<string, string[]> = {
+                                DRAFT: ['DRAFT','PENDING','ORDERED','CANCELLED'],
+                                PENDING: ['PENDING','ORDERED','CANCELLED'],
+                                ORDERED: ['ORDERED','CANCELLED'],
+                                PARTIALLY_RECEIVED: ['PARTIALLY_RECEIVED','RECEIVED','CANCELLED'],
+                                RECEIVED: ['RECEIVED'],
+                                CANCELLED: ['CANCELLED'],
+                              };
+                              const opts = allowed[poData.status] || [poData.status];
+                              return opts.map(s => ({ value: s, label: s }));
+                            })()}
+                          />
+                          {poData.status !== 'PARTIALLY_RECEIVED' && (
+                            <p className="text-xs text-text-secondary mt-1">Pour marquer la commande comme <b>RECEIVED</b>, utilisez l'action <b>Réceptionner</b>.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <StatusBadge status={poData.status} />
+                      )}
+                    </div>
                 </div>
 
                 <div className="max-h-[50vh] overflow-y-auto">

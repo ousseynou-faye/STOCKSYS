@@ -1,5 +1,6 @@
 ﻿import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
+import { Req } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt.guard.js";
 import { PermissionsGuard } from "../common/guards/permissions.guard.js";
 import { RequirePermissions } from "../common/decorators/permissions.decorator.js";
@@ -17,7 +18,7 @@ export class StoresController {
   @RequirePermissions('VIEW_STORES')
   @Get()
   @ApiOkResponse({ description: 'Liste des boutiques', schema: { example: { data: [{ id: 'store_1', name: 'Boutique Principale' }], meta: { page: 1, limit: 20, total: 2 } } } })
-  findAll(@Query() q: any) { return this.service.findAll(q); }
+  findAll(@Req() req: any, @Query() q: any) { return this.service.findAll(q, req.user); }
 
   @RequirePermissions('MANAGE_STORES')
   @Post()

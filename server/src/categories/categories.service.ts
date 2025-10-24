@@ -26,10 +26,10 @@ export class CategoriesService {
     if (!exists) throw new NotFoundException(FR.ERR_CATEGORY_NOT_FOUND);
     return this.prisma.category.update({ where: { id }, data });
   }
-  async remove(id: string) {
+  async remove(id: string): Promise<void> {
     const exists = await this.prisma.category.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(FR.ERR_CATEGORY_NOT_FOUND);
     await this.prisma.category.delete({ where: { id } });
-    return { success: true };
+    return;
   }
 }

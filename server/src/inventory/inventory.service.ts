@@ -7,7 +7,7 @@ import { FR } from '../common/i18n/fr.js';
 export class InventoryService {
   constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
 
-    async list(q?: any) {
+    async list(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(q?.limit ?? '20', 10) || 20, 1), 100);
     const skip = (page - 1) * limit;
@@ -16,7 +16,13 @@ export class InventoryService {
       ? (sort as any[]).map((s: any) => (s.startsWith('-') ? { [s.slice(1)]: 'desc' } : { [s]: 'asc' }))
       : (sort.startsWith('-') ? { [sort.slice(1)]: 'desc' } : { [sort]: 'asc' });
     const where: any = {};
-    if (q?.storeId) where.storeId = q.storeId;
+    if ((user?.permissions || []).includes('MANAGE_ROLES')) {
+      if (q?.storeId) where.storeId = q.storeId;
+    } else if (user?.storeId) {
+      where.storeId = user.storeId;
+    } else if (q?.storeId) {
+      where.storeId = q.storeId;
+    }
     if (q?.status) where.status = q.status;
     const total = await this.prisma.inventorySession.count({ where });
     const data = await this.prisma.inventorySession.findMany({ where, orderBy, skip, take: limit, include: { items: true } });
@@ -25,6 +31,9 @@ export class InventoryService {
   }
 
   async start(storeId: string, user?: any) {
+    if (!((user?.permissions || []).includes('MANAGE_ROLES')) && user?.storeId && storeId !== user.storeId) {
+      throw new BadRequestException('Inventaire limité à votre boutique.');
+    }
     const stock = await this.prisma.productStock.findMany({ where: { storeId } });
     const session = await this.prisma.inventorySession.create({
       data: {

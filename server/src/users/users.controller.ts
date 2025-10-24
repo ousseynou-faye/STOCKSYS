@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { PermissionsGuard } from '../common/guards/permissions.guard.js';
@@ -17,7 +17,7 @@ export class UsersController {
   @RequirePermissions('VIEW_USERS')
   @Get()
   @ApiOkResponse({ description: 'Liste utilisateurs', schema: { example: { data: [{ id: 'user_admin', username: 'admin', roleIds: ['role_admin'] }] } } })
-  findAll(@Query() q: any) { return this.service.findAll(q); }
+  findAll(@Req() req: any, @Query() q: any) { return this.service.findAll(q, req.user); }
 
   @RequirePermissions('MANAGE_USERS')
   @Post()

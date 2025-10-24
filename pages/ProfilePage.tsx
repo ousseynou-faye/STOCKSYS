@@ -1,9 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
 import { Card, Input, Button, Modal } from '../components/ui';
 // Fix: Add missing imports
 import { MOCK_ROLES, MOCK_STORES, apiUpdatePassword, apiUpdateUser } from '../services/mockApi';
+import { USE_API, STRICT_API } from '../services/apiClient';
+import { apiUsers } from '../services/apiUsers';
+import { apiAuth } from '../services/apiAuth';
+import { apiStores } from '../services/apiStores';
 import { UserCircleIcon, CameraIcon } from '../components/icons';
 
 const PREDEFINED_AVATARS = [
@@ -27,17 +31,57 @@ const ProfilePage: React.FC = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
+    const [rolesList, setRolesList] = useState<{ id: string; name: string }[]>([]);
+    const [storesList, setStoresList] = useState<{ id: string; name: string }[]>([]);
+
+    useEffect(() => {
+        const load = async () => {
+            if (!USE_API) {
+                setRolesList(MOCK_ROLES as any);
+                setStoresList(MOCK_STORES as any);
+                return;
+            }
+            try {
+                const [r, s] = await Promise.all([
+                    apiUsers.fetchRoles(),
+                    apiStores.fetchStores(),
+                ]);
+                const rolesArr = Array.isArray(r) ? (r as any) : (Array.isArray((r as any)?.data) ? (r as any).data : []);
+                const storesArr = Array.isArray(s) ? (s as any) : (Array.isArray((s as any)?.data) ? (s as any).data : []);
+                setRolesList(rolesArr as any);
+                setStoresList(storesArr as any);
+            } catch (e) {
+                // Fallback (avoid empty profile in non-strict mode)
+                setRolesList(STRICT_API ? [] : (MOCK_ROLES as any));
+                setStoresList(STRICT_API ? [] : (MOCK_STORES as any));
+            }
+        };
+        load();
+    }, []);
+
+    const selectedRoles = useMemo(() => {
+        if (!user) return [] as { id: string; name: string; permissions?: string[] }[];
+        const ids = Array.isArray(user.roleIds) ? user.roleIds : [];
+        return (Array.isArray(rolesList) ? rolesList : []).filter(r => ids.includes(r.id)) as any[];
+    }, [user, rolesList]);
+
     const userRoles = useMemo(() => {
         if (!user) return 'N/A';
-        return MOCK_ROLES.filter(role => user.roleIds.includes(role.id))
-            .map(role => role.name)
-            .join(', ');
-    }, [user]);
+        const names = selectedRoles.map(r => r.name);
+        return names.length ? names.join(', ') : 'Aucun rôle';
+    }, [user, selectedRoles]);
+
+    const aggregatedPermissionCount = useMemo(() => {
+        const set = new Set<string>();
+        selectedRoles.forEach((r: any) => (Array.isArray(r.permissions) ? r.permissions : []).forEach((p: string) => set.add(p)));
+        return set.size;
+    }, [selectedRoles]);
 
     const userStore = useMemo(() => {
         if (!user || !user.storeId) return 'N/A';
-        return MOCK_STORES.find(store => store.id === user.storeId)?.name || 'N/A';
-    }, [user]);
+        const s = (Array.isArray(storesList) ? storesList : []).find(st => st.id === user.storeId);
+        return s?.name || 'N/A';
+    }, [user, storesList]);
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -47,14 +91,26 @@ const ProfilePage: React.FC = () => {
         }
         if (!user) return;
 
-        const result = await apiUpdatePassword(user.id, currentPassword, newPassword);
-        if (result.success) {
-            addToast({ message: result.message, type: 'success' });
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
+        if (USE_API) {
+            try {
+                await apiAuth.changePassword(currentPassword, newPassword);
+                addToast({ message: 'Mot de passe mis à jour avec succès.', type: 'success' });
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            } catch (err: any) {
+                addToast({ message: err?.message || 'Échec de la mise à jour du mot de passe.', type: 'error' });
+            }
         } else {
-            addToast({ message: result.message, type: 'error' });
+            const result = await apiUpdatePassword(user.id, currentPassword, newPassword);
+            if (result.success) {
+                addToast({ message: result.message, type: 'success' });
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            } else {
+                addToast({ message: result.message, type: 'error' });
+            }
         }
     };
 
@@ -65,7 +121,18 @@ const ProfilePage: React.FC = () => {
         updateCurrentUser({ profilePictureUrl: url });
 
         // API call
-        await apiUpdateUser(user.id, { profilePictureUrl: url }, user.id);
+        if (USE_API) {
+            try {
+                await apiUsers.updateUser(user.id, { profilePictureUrl: url });
+            } catch (err) {
+                // Revert on failure
+                updateCurrentUser({ profilePictureUrl: user.profilePictureUrl });
+                addToast({ message: "Échec de la mise à jour de la photo.", type: 'error' });
+                return;
+            }
+        } else {
+            await apiUpdateUser(user.id, { profilePictureUrl: url }, user.id);
+        }
         
         addToast({ message: "Photo de profil mise à jour.", type: 'success' });
         setIsAvatarModalOpen(false);
@@ -95,6 +162,18 @@ const ProfilePage: React.FC = () => {
                 </div>
                 <h2 className="text-2xl font-bold text-text-primary">{user.username}</h2>
                 <p className="text-text-secondary">{userRoles}</p>
+                {selectedRoles.length > 0 && (
+                    <div className="mt-3 w-full">
+                        <div className="flex flex-wrap gap-2">
+                            {selectedRoles.map((r) => (
+                                <span key={r.id} className="px-2 py-1 text-xs rounded-full bg-secondary/40 text-text-secondary border border-secondary/60">
+                                    {r.name}
+                                </span>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-xs text-text-secondary">Permissions totales: <span className="font-semibold text-text-primary">{aggregatedPermissionCount}</span></p>
+                    </div>
+                )}
                 <p className="text-accent text-sm mt-1">{userStore}</p>
             </Card>
 

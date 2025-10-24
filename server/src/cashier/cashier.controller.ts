@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { PermissionsGuard } from '../common/guards/permissions.guard.js';
 import { RequirePermissions } from '../common/decorators/permissions.decorator.js';
@@ -13,7 +13,7 @@ export class CashierController {
 
   @RequirePermissions('MANAGE_CASHIER_SESSIONS')
   @Get()
-  list(@Query() q: any) { return this.service.list(q); }
+  list(@Req() req: any, @Query() q: any) { return this.service.list(q, req.user); }
 
   @RequirePermissions('MANAGE_CASHIER_SESSIONS')
   @Get('active')

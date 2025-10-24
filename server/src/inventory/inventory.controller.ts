@@ -13,7 +13,7 @@ export class InventoryController {
 
   @RequirePermissions('PERFORM_INVENTORY')
   @Get()
-  list() { return this.service.list(); }
+  list(@Req() req: any) { return this.service.list({}, req.user); }
 
   @RequirePermissions('PERFORM_INVENTORY')
   @Post()

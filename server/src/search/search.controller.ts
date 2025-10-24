@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { SearchService } from './search.service.js';
 
@@ -8,6 +8,5 @@ export class SearchController {
   constructor(private readonly service: SearchService) {}
 
   @Get()
-  global(@Query('term') term: string) { return this.service.global(term); }
+  global(@Req() req: any, @Query('term') term: string) { return this.service.global(term, req.user); }
 }
-
