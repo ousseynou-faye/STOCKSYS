@@ -17,14 +17,14 @@ export class ExpensesController {
 
   @RequirePermissions('MANAGE_EXPENSES')
   @Post()
-  create(@Body() body: CreateExpenseDto) { return this.service.create(body); }
+  create(@Req() req: any, @Body() body: CreateExpenseDto) { return this.service.create(body, req.user); }
 
   @RequirePermissions('MANAGE_EXPENSES')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateExpenseDto) { return this.service.update(id, body); }
+  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateExpenseDto) { return this.service.update(id, body, req.user); }
 
   @RequirePermissions('MANAGE_EXPENSES')
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) { return this.service.remove(id); }
+  remove(@Req() req: any, @Param('id') id: string) { return this.service.remove(id, req.user); }
 }

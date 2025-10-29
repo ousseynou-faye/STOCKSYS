@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { NotificationsService } from './notifications.service.js';
 
@@ -8,9 +8,8 @@ export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
   @Get()
-  list() { return this.service.list(); }
+  list(@Req() req: any) { return this.service.list(req.user); }
 
   @Post('mark-all-read')
-  markAllRead() { return this.service.markAllRead(); }
+  markAllRead(@Req() req: any) { return this.service.markAllRead(req.user); }
 }
-

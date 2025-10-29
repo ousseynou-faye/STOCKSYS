@@ -15,18 +15,28 @@ const ToastMessage: React.FC<ToastProps> = ({ toast, onDismiss }) => {
     };
 
     return (
-        <div className={`
+        <div
+            role="alert"
+            aria-atomic="true"
+            aria-live={toast.type === 'info' ? 'polite' : 'assertive'}
+            className={`
             flex items-start p-4 rounded-lg shadow-2xl text-white w-full max-w-sm
             ${typeClasses[toast.type].bg} 
             animate-toast-in
-        `}>
+        `}
+        >
             <div className="flex-shrink-0 mr-3">
                 {typeClasses[toast.type].icon}
             </div>
             <div className="flex-grow text-sm font-medium">
                 {toast.message}
             </div>
-            <button onClick={() => onDismiss(toast.id)} className="ml-4 flex-shrink-0">
+            <button
+                type="button"
+                onClick={() => onDismiss(toast.id)}
+                className="ml-4 flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 rounded"
+                aria-label="Fermer la notification"
+            >
                 <CloseIcon className="w-5 h-5 text-white/80 hover:text-white" />
             </button>
         </div>
@@ -41,7 +51,12 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
     return (
-        <div className="fixed top-4 right-4 z-[100] space-y-2">
+        <div
+            className="fixed top-4 right-4 z-[100] space-y-2"
+            role="region"
+            aria-live="assertive"
+            aria-relevant="additions"
+        >
             {toasts.map(toast => (
                 <ToastMessage key={toast.id} toast={toast} onDismiss={onDismiss} />
             ))}

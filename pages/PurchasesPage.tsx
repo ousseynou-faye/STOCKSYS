@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Button, Modal, Select, Input, ConfirmationModal, ExportDropdown } from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
@@ -24,12 +24,13 @@ import {
     MOCK_USERS,
     apiFetchStock
 } from '../services/mockApi';
-import { USE_API } from '../services/apiClient';
+import { USE_API, ApiError } from '../services/apiClient';
 import { apiPurchases } from '../services/apiPurchases';
 import { apiSuppliers } from '../services/apiSuppliers';
 import { apiStores } from '../services/apiStores';
 import { apiProducts } from '../services/apiProducts';
 import { TrashIcon } from '../components/icons';
+import { fromApiPurchaseOrderStatus, toApiPurchaseOrderStatus } from '../services/apiMappers';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -50,6 +51,7 @@ const StatusBadge: React.FC<{ status: PurchaseOrderStatus }> = ({ status }) => {
 const PurchasesPage: React.FC = () => {
     const { user, hasPermission } = useAuth();
     const { addToast } = useToast();
+    const isAdmin = hasPermission(Permission.MANAGE_ROLES);
     const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [stores, setStores] = useState<Store[]>([]);
@@ -67,6 +69,13 @@ const PurchasesPage: React.FC = () => {
         supplierId: '',
         status: '',
     });
+
+    useEffect(() => {
+        if (!isAdmin) {
+            const forcedStore = user?.storeId || '';
+            setFilters(prev => (prev.storeId === forcedStore ? prev : { ...prev, storeId: forcedStore }));
+        }
+    }, [isAdmin, user?.storeId]);
 
     useEffect(() => {
         const load = async () => {
@@ -101,7 +110,7 @@ const PurchasesPage: React.FC = () => {
                 }
             } catch (e: any) {
                 if (e?.status === 403) {
-                    addToast({ message: 'Accès refusé — permission requise: VIEW_PURCHASES', type: 'error' });
+                    addToast({ message: 'Acces refuse - permission requise: VIEW_PURCHASES', type: 'error' });
                     setPurchaseOrders([]);
                     setSuppliers([]);
                     setStores([]);
@@ -122,7 +131,19 @@ const PurchasesPage: React.FC = () => {
         load();
     }, [refreshKey, user, hasPermission]);
 
+    const storeOptions = useMemo(() => {
+        if (isAdmin) {
+            return [{ value: '', label: 'Toutes' }, ...stores.map(s => ({ value: s.id, label: s.name }))];
+        }
+        if (user?.storeId) {
+            const label = stores.find(s => s.id === user.storeId)?.name || 'Ma boutique';
+            return [{ value: user.storeId, label }];
+        }
+        return [{ value: '', label: 'Toutes' }];
+    }, [isAdmin, stores, user?.storeId]);
+
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        if (e.target.name === 'storeId' && !isAdmin) return;
         setFilters({ ...filters, [e.target.name]: e.target.value });
     };
 
@@ -167,10 +188,10 @@ const PurchasesPage: React.FC = () => {
         { header: 'Fournisseur', accessor: 'supplierName' },
         { header: 'Boutique', accessor: 'storeName' },
         { header: 'Statut', accessor: (item: any) => <StatusBadge status={item.status} /> },
-        { header: 'Date Création', accessor: (item: any) => new Date(item.createdAt).toLocaleDateString('fr-FR') },
+        { header: 'Date Creation', accessor: (item: any) => new Date(item.createdAt).toLocaleDateString('fr-FR') },
         { header: 'Actions', accessor: (item: any) => (
             <div className="flex gap-2">
-                <Button variant="secondary" size="sm" onClick={() => openModal(item, 'details')}>Détails</Button>
+                <Button variant="secondary" size="sm" onClick={() => openModal(item, 'details')}>Details</Button>
                 {hasPermission(Permission.MANAGE_PURCHASE_ORDERS) && item.status !== PurchaseOrderStatus.RECEIVED && item.status !== PurchaseOrderStatus.CANCELLED && (
                     <Button variant="secondary" size="sm" onClick={() => openModal(item, 'edit')}>Modifier</Button>
                 )}
@@ -181,13 +202,13 @@ const PurchasesPage: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <p className="text-lg text-text-secondary">Gérez les commandes d'achat auprès de vos fournisseurs.</p>
+                <p className="text-lg text-text-secondary">Gerez les commandes d'achat aupres de vos fournisseurs.</p>
                 {hasPermission(Permission.CREATE_PURCHASE_ORDER) && <Button onClick={handleCreateClick}>Nouvelle Commande</Button>}
             </div>
 
             <Card>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <Select label="Filtrer par boutique" id="storeId" name="storeId" value={filters.storeId} onChange={handleFilterChange} options={[{value: '', label: 'Toutes'}, ...stores.map(s => ({value: s.id, label: s.name}))]} disabled={!!user?.storeId} />
+                    <Select label="Filtrer par boutique" id="storeId" name="storeId" value={filters.storeId} onChange={handleFilterChange} options={storeOptions} disabled={!isAdmin} />
                     <Select label="Filtrer par fournisseur" id="supplierId" name="supplierId" value={filters.supplierId} onChange={handleFilterChange} options={[{value: '', label: 'Tous'}, ...suppliers.map(s => ({value: s.id, label: s.name}))]} />
                     <Select label="Filtrer par statut" id="status" name="status" value={filters.status} onChange={handleFilterChange} options={[{value: '', label: 'Tous'}, ...Object.values(PurchaseOrderStatus).map(s => ({value: s, label: s}))]} />
                 </div>
@@ -230,15 +251,32 @@ interface POModalProps {
 
 const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseOrder, mode, onSave, suppliers, stores, products }) => {
     const [poData, setPoData] = useState<PurchaseOrder>(purchaseOrder);
-    const [showReceive, setShowReceive] = useState(false);
     const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
-    const { user } = useAuth();
+    const [internalMode, setInternalMode] = useState<ModalState>(mode);
+    const { user, hasPermission } = useAuth();
+    const isAdmin = hasPermission(Permission.MANAGE_ROLES);
     const { addToast } = useToast();
-    const isEditable = mode === 'edit' && poData.status === PurchaseOrderStatus.DRAFT;
+    const canEditItems = internalMode === 'edit' && poData.status === PurchaseOrderStatus.DRAFT;
+    const canEditStatus = internalMode === 'edit';
+    const canEditStore = canEditItems && isAdmin;
+    const storeLabel = useMemo(() => {
+        const found = stores.find(s => s.id === poData.storeId);
+        return found?.name || poData.storeId || 'N/A';
+    }, [stores, poData.storeId]);
 
     useEffect(() => {
         setPoData(purchaseOrder);
     }, [purchaseOrder]);
+
+    useEffect(() => {
+        if (!isAdmin && user?.storeId) {
+            setPoData(prev => (prev.storeId === user.storeId ? prev : { ...prev, storeId: user.storeId }));
+        }
+    }, [isAdmin, user?.storeId]);
+
+    useEffect(() => {
+        setInternalMode(mode);
+    }, [mode]);
 
     const getProductName = (variationId: string) => {
         const product = products.find(p => p.id === variationId || p.variations?.some(v => v.id === variationId));
@@ -263,74 +301,117 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
     const handleRemoveItem = (index: number) => {
         setPoData({ ...poData, items: poData.items.filter((_, i) => i !== index) });
     };
-    
+
     const handleSave = async () => {
         if (!user) return;
-        if (!poData.supplierId) { addToast({ message: 'Sélectionnez un fournisseur.', type: 'error' }); return; }
-        if (!poData.storeId) { addToast({ message: 'Sélectionnez une boutique.', type: 'error' }); return; }
+        if (!poData.supplierId) { addToast({ message: 'Selectionnez un fournisseur.', type: 'error' }); return; }
+        if (!poData.storeId) { addToast({ message: 'Selectionnez une boutique.', type: 'error' }); return; }
         if (poData.items.length === 0) {
-            addToast({ message: "Ajoutez au moins un produit.", type: 'error' });
+            addToast({ message: 'Ajoutez au moins un produit.', type: 'error' });
             return;
         }
         if (poData.items.some(it => !it.variationId || Number(it.quantity) <= 0 || Number(it.price) < 0)) {
-            addToast({ message: 'Vérifiez les articles: quantité > 0 et prix >= 0.', type: 'error' });
+            addToast({ message: 'Verifiez les articles: quantite > 0 et prix >= 0.', type: 'error' });
             return;
         }
-        const poSanitized = {
-            ...poData,
-            items: poData.items.map(it => ({
-                ...it,
-                quantity: Number(it.quantity),
-                receivedQuantity: Number(it.receivedQuantity),
-                price: Number(it.price),
-            })),
-        };
-        if (poData.id.startsWith('po-')) { // New PO
-            if (USE_API) await apiPurchases.createPO(poSanitized);
-            else await apiCreatePurchaseOrder(poData, user.id);
-            addToast({ message: "Commande créée.", type: 'success' });
-        } else {
-            if (USE_API) await apiPurchases.updatePO(poData.id, poSanitized);
-            else await apiUpdatePurchaseOrder(poData.id, poData, user.id);
-            addToast({ message: "Commande mise à jour.", type: 'success' });
+
+        const itemsSanitized = poData.items.map(it => ({
+            ...it,
+            quantity: Number(it.quantity),
+            receivedQuantity: Number(it.receivedQuantity),
+            price: Number(it.price),
+        }));
+        const isDraft = poData.status === PurchaseOrderStatus.DRAFT;
+        const isNew = poData.id.startsWith('po-');
+
+        try {
+            if (isNew) {
+                if (USE_API) {
+                    await apiPurchases.createPO({ ...poData, items: itemsSanitized });
+                } else {
+                    await apiCreatePurchaseOrder({ ...poData, items: itemsSanitized }, user.id);
+                }
+                addToast({ message: 'Commande creee.', type: 'success' });
+            } else {
+                const payload: any = { status: poData.status };
+                if (poData.supplierId) payload.supplierId = poData.supplierId;
+                if (poData.storeId) payload.storeId = poData.storeId;
+                if (isDraft) payload.items = itemsSanitized;
+
+                if (USE_API) await apiPurchases.updatePO(poData.id, payload);
+                else await apiUpdatePurchaseOrder(poData.id, payload, user.id);
+
+                addToast({ message: 'Commande mise a jour.', type: 'success' });
+            }
+            onSave();
+        } catch (e: any) {
+            addToast({ message: e?.message || 'Erreur lors de la sauvegarde.', type: 'error' });
         }
-        onSave();
     };
+
+
 
     const handleReceive = async () => {
         if (!user) return;
-        const itemsToReceive = Object.entries(receiveQuantities)
-            // Fix: Explicitly convert quantity to a number to satisfy TypeScript's type checking for the filter and the API call.
-            .map(([variationId, quantity]) => ({ variationId, quantity: Number(quantity) }))
-            .filter(item => item.quantity > 0);
-        
+
+        const itemsToReceive: { variationId: string; quantity: number }[] = [];
+        for (const [variationId, rawQty] of Object.entries(receiveQuantities)) {
+            const item = poData.items.find(it => it.variationId === variationId);
+            if (!item) continue;
+            const quantity = Number(rawQty);
+            if (!Number.isFinite(quantity) || quantity <= 0) continue;
+            const remaining = Math.max(0, Number(item.quantity) - Number(item.receivedQuantity));
+            if (remaining <= 0) continue;
+            if (quantity > remaining) {
+                const name = getProductName(variationId);
+                addToast({
+                    message: `Quantite a recevoir trop elevee pour ${name}. Maximum restant: ${remaining}.`,
+                    type: 'error',
+                });
+                return;
+            }
+            itemsToReceive.push({ variationId, quantity });
+        }
+
         if (itemsToReceive.length === 0) {
-            addToast({ message: "Aucune quantité à recevoir.", type: 'error' });
+            addToast({ message: 'Aucune quantite valide a recevoir.', type: 'error' });
             return;
         }
 
-        if (USE_API) await apiPurchases.receivePO(poData.id, itemsToReceive);
-        else await apiReceivePurchaseOrderItems(poData.id, itemsToReceive, user.id);
-        addToast({ message: "Réception enregistrée.", type: 'success' });
-        onSave();
+        try {
+            if (USE_API) await apiPurchases.receivePO(poData.id, itemsToReceive);
+            else await apiReceivePurchaseOrderItems(poData.id, itemsToReceive, user.id);
+            addToast({ message: 'Reception enregistree.', type: 'success' });
+            setReceiveQuantities({});
+            setInternalMode('details');
+            onSave();
+        } catch (e) {
+            let message = 'Erreur lors de la reception.';
+            if (e instanceof ApiError) {
+                message = e.message || `Erreur API (${e.status})`;
+            } else if (typeof (e as any)?.message === 'string' && (e as any).message.trim().length > 0) {
+                message = (e as any).message;
+            }
+            addToast({ message, type: 'error' });
+        }
     };
 
     const title = {
-        'edit': poData.id.startsWith('po-') ? "Créer une commande" : "Modifier la commande",
-        'details': `Détails Commande #${poData.id.slice(-6)}`,
-        'receive': `Réceptionner la Commande #${poData.id.slice(-6)}`,
+        'edit': poData.id.startsWith('po-') ? "Creer une commande" : "Modifier la commande",
+        'details': `Details Commande #${poData.id.slice(-6)}`,
+        'receive': `Receptionner la Commande #${poData.id.slice(-6)}`,
         'closed': ''
-    }[mode];
+    }[internalMode];
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title} wrapperClassName="md:max-w-4xl">
             <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4 p-4 bg-secondary/30 rounded-lg">
-                    <div><span className="font-semibold">Fournisseur:</span> {isEditable ? <Select label="" id="supplierId" value={poData.supplierId} onChange={e => setPoData({...poData, supplierId: e.target.value})} options={suppliers.map(s => ({value: s.id, label: s.name}))}/> : suppliers.find(s => s.id === poData.supplierId)?.name}</div>
-                    <div><span className="font-semibold">Boutique:</span> {isEditable ? <Select label="" id="storeId" value={poData.storeId} onChange={e => setPoData({...poData, storeId: e.target.value})} options={stores.map(s => ({value: s.id, label: s.name}))}/> : stores.find(s => s.id === poData.storeId)?.name}</div>
+                    <div><span className="font-semibold">Fournisseur:</span> {canEditItems ? <Select label="" id="supplierId" value={poData.supplierId} onChange={e => setPoData({...poData, supplierId: e.target.value})} options={suppliers.map(s => ({value: s.id, label: s.name}))}/> : suppliers.find(s => s.id === poData.supplierId)?.name}</div>
+                    <div><span className="font-semibold">Boutique:</span> {canEditStore ? <Select label="" id="storeId" value={poData.storeId} onChange={e => setPoData({...poData, storeId: e.target.value})} options={stores.map(s => ({value: s.id, label: s.name}))}/> : storeLabel}</div>
                     <div>
                       <span className="font-semibold">Statut:</span>
-                      {isEditable ? (
+                      {canEditStatus ? (
                         <div>
                           <Select
                             label=""
@@ -338,7 +419,7 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
                             value={poData.status}
                             onChange={e => setPoData({ ...poData, status: e.target.value as PurchaseOrderStatus })}
                             options={(() => {
-                              const allowed: Record<string, string[]> = {
+                              const transitions: Record<string, string[]> = {
                                 DRAFT: ['DRAFT','PENDING','ORDERED','CANCELLED'],
                                 PENDING: ['PENDING','ORDERED','CANCELLED'],
                                 ORDERED: ['ORDERED','CANCELLED'],
@@ -346,12 +427,16 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
                                 RECEIVED: ['RECEIVED'],
                                 CANCELLED: ['CANCELLED'],
                               };
-                              const opts = allowed[poData.status] || [poData.status];
-                              return opts.map(s => ({ value: s, label: s }));
+                              const current = toApiPurchaseOrderStatus(poData.status);
+                              const allowed = transitions[current] || [current];
+                              return allowed.map(code => {
+                                const uiValue = fromApiPurchaseOrderStatus(code);
+                                return { value: uiValue, label: uiValue };
+                              });
                             })()}
                           />
                           {poData.status !== 'PARTIALLY_RECEIVED' && (
-                            <p className="text-xs text-text-secondary mt-1">Pour marquer la commande comme <b>RECEIVED</b>, utilisez l'action <b>Réceptionner</b>.</p>
+                            <p className="text-xs text-text-secondary mt-1">Pour marquer la commande comme <b>RECEIVED</b>, utilisez l'action <b>Receptionner</b>.</p>
                           )}
                         </div>
                       ) : (
@@ -361,40 +446,55 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
                 </div>
 
                 <div className="max-h-[50vh] overflow-y-auto">
-                    {/* Items table */}
                      <table className="w-full text-left">
                          <thead><tr className="border-b border-secondary">
                              <th className="p-2">Produit</th>
-                             <th className="p-2">Qté Commandée</th>
-                             <th className="p-2">Qté Reçue</th>
+                             <th className="p-2">Qte Commandee</th>
+                             <th className="p-2">Qte Recue</th>
                              <th className="p-2">Prix Unitaire</th>
-                             {mode === 'receive' && <th className="p-2">Quantité à recevoir</th>}
-                             {isEditable && <th className="p-2">Action</th>}
+                             {internalMode === 'receive' && <th className="p-2">Quantite a recevoir</th>}
+                             {canEditItems && <th className="p-2">Action</th>}
                          </tr></thead>
                          <tbody>
                              {poData.items.map((item, index) => (
                                  <tr key={index} className="border-b border-secondary/50">
                                      <td className="p-2">{getProductName(item.variationId)}</td>
-                                     <td className="p-2">{isEditable ? <Input type="number" label="" id={`qty-${index}`} value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value))} /> : item.quantity}</td>
+                                     <td className="p-2">{canEditItems ? <Input type="number" label="" id={`qty-${index}`} value={item.quantity} onChange={e => handleItemChange(index, 'quantity', Number(e.target.value))} /> : item.quantity}</td>
                                      <td className="p-2">{item.receivedQuantity}</td>
-                                     <td className="p-2">{isEditable ? <Input type="number" label="" id={`price-${index}`} value={item.price} onChange={e => handleItemChange(index, 'price', Number(e.target.value))} /> : item.price}</td>
-                                     {mode === 'receive' && 
+                                     <td className="p-2">{canEditItems ? <Input type="number" label="" id={`price-${index}`} value={item.price} onChange={e => handleItemChange(index, 'price', Number(e.target.value))} /> : item.price}</td>
+                                     {internalMode === 'receive' && 
                                         <td className="p-2">
                                             <Input type="number" label="" id={`receive-${index}`} value={receiveQuantities[item.variationId] || ''} onChange={e => setReceiveQuantities({...receiveQuantities, [item.variationId]: Number(e.target.value)})} max={item.quantity - item.receivedQuantity} min="0" />
                                         </td>
                                      }
-                                     {isEditable && <td className="p-2"><Button variant="danger" size="sm" onClick={() => handleRemoveItem(index)}><TrashIcon/></Button></td>}
+                                     {canEditItems && <td className="p-2"><Button variant="danger" size="sm" onClick={() => handleRemoveItem(index)}><TrashIcon/></Button></td>}
                                  </tr>
                              ))}
                          </tbody>
                      </table>
-                     {isEditable && <Select value="" onChange={e => handleAddItem(e.target.value)} options={[{value: '', label: "Ajouter un produit..."}, ...products.flatMap(p => p.variations ? p.variations.map(v => ({ value: v.id, label: `${p.name} (${Object.values(v.attributes).join(' / ')})` })) : [{ value: p.id, label: p.name }]) ]} />}
+                     {canEditItems && <Select value="" onChange={e => handleAddItem(e.target.value)} options={[{value: '', label: "Ajouter un produit..."}, ...products.flatMap(p => p.variations ? p.variations.map(v => ({ value: v.id, label: `${p.name} (${Object.values(v.attributes).join(' / ')})` })) : [{ value: p.id, label: p.name }]) ]} />}
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                    {mode === 'edit' && <Button onClick={handleSave}>Enregistrer</Button>}
-                    {mode === 'details' && poData.status !== PurchaseOrderStatus.RECEIVED && <Button onClick={() => setReceiveQuantities({})}>Réceptionner</Button>}
-                    {mode === 'receive' && <Button onClick={handleReceive}>Confirmer Réception</Button>}
+                    {internalMode === 'edit' && <Button onClick={handleSave}>Enregistrer</Button>}
+                    {internalMode === 'details' && poData.status !== PurchaseOrderStatus.RECEIVED && (
+                        <Button
+                            onClick={() => {
+                                setReceiveQuantities({});
+                                setInternalMode('receive');
+                            }}
+                        >
+                            Receptionner
+                        </Button>
+                    )}
+                    {internalMode === 'receive' && (
+                        <>
+                            <Button onClick={handleReceive}>Confirmer reception</Button>
+                            <Button variant="secondary" onClick={() => setInternalMode('details')}>
+                                Annuler
+                            </Button>
+                        </>
+                    )}
                     <Button variant="secondary" onClick={onClose}>Fermer</Button>
                 </div>
             </div>
@@ -404,3 +504,19 @@ const PurchaseOrderModal: React.FC<POModalProps> = ({ isOpen, onClose, purchaseO
 
 
 export default PurchasesPage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
