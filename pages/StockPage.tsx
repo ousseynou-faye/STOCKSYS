@@ -79,18 +79,11 @@ const StockLevelList: React.FC = () => {
                         return;
                     } else {
                         console.error('API stock/products failed', e);
-                        if (STRICT_API) {
-                            addToast({ message: "Erreur de chargement du stock/produits.", type: 'error' });
-                            setStockLevels([]);
-                            setProducts([]);
-                            setStores([]);
-                            setCategories([]);
-                        } else {
-                            setStockLevels(apiFetchStock());
-                            setProducts(apiFetchProducts());
-                            setStores(hasPermission(Permission.VIEW_STORES) ? apiFetchStores() : []);
-                            setCategories(hasPermission(Permission.VIEW_CATEGORIES) ? apiFetchCategories() : []);
-                        }
+                        addToast({ message: "Erreur de chargement du stock/produits.", type: 'error' });
+                        setStockLevels([]);
+                        setProducts([]);
+                        setStores([]);
+                        setCategories([]);
                     }
                 }
             } else {
@@ -145,10 +138,10 @@ const StockLevelList: React.FC = () => {
         const formData = new FormData(e.currentTarget);
         const raw = formData.get('newQuantity');
         const parsedQty = Number(raw);
-        if (!Number.isFinite(parsedQty) || parsedQty < 0) { addToast({ message: 'Quantité invalide. Entrez un nombre = 0.', type: 'error' }); return; }
-        if (Math.floor(parsedQty) !== parsedQty) { addToast({ message: 'La quantité doit être un entier.', type: 'error' }); return; }
+        if (!Number.isFinite(parsedQty) || parsedQty < 0) { addToast({ message: 'QuantitÃ© invalide. Entrez un nombre â‰¥ 0.', type: 'error' }); return; }
+        if (Math.floor(parsedQty) !== parsedQty) { addToast({ message: 'La quantitÃ© doit Ãªtre un entier.', type: 'error' }); return; }
         const newQuantity = parsedQty;
-        if (typeof adjustingStock.quantity === 'number' && newQuantity === adjustingStock.quantity) { addToast({ message: 'Aucune modification: quantité identique.', type: 'info' }); return; }
+        if (typeof adjustingStock.quantity === 'number' && newQuantity === adjustingStock.quantity) { addToast({ message: 'Aucune modificationâ€¯: quantitÃ© identique.', type: 'info' }); return; }
         const ok = window.confirm(`Confirmer l'ajustement du stock
 ${adjustingStock.productName} ${adjustingStock.variationName ? '('+adjustingStock.variationName+')' : ''}
 ${adjustingStock.storeName}
@@ -446,9 +439,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
     const [selVar, setSelVar] = useState('');
     const [selQty, setSelQty] = useState(1);
     const addBundleComp = () => {
-        if (!selVar) { addToast({ message: 'Sélectionnez une variation.', type: 'error' }); return; }
-        if (!Number.isFinite(selQty) || selQty <= 0 || Math.floor(selQty) !== selQty) { addToast({ message: 'Quantité composant invalide (entier > 0).', type: 'error' }); return; }
-        if (bundleComps.some(b => b.componentVariationId === selVar)) { addToast({ message: 'Ce composant est déjà ajouté.', type: 'info' }); return; }
+        if (!selVar) { addToast({ message: 'SÃ©lectionnez une variation.', type: 'error' }); return; }
+        if (!Number.isFinite(selQty) || selQty <= 0 || Math.floor(selQty) !== selQty) { addToast({ message: 'QuantitÃ© composant invalide (entier > 0).', type: 'error' }); return; }
+        if (bundleComps.some(b => b.componentVariationId === selVar)) { addToast({ message: 'Ce composant est dÃ©jÃ  ajoutÃ©.', type: 'info' }); return; }
         if (product && product.variations?.some(v => v.id === selVar)) { addToast({ message: 'Un produit ne peut pas contenir sa propre variation en composant.', type: 'error' }); return; }
         setBundleComps(prev => [...prev, { componentVariationId: selVar, quantity: selQty }]);
         setSelVar(''); setSelQty(1);
@@ -462,10 +455,10 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
         e.preventDefault();
         if (!user) return;
         
-        // Pré-validation produit
+        // PrÃ©-validation produit
         const pd: any = productData || {};
         if (!pd.name || String(pd.name).trim().length < 2) { addToast({ message: 'Nom de produit trop court.', type: 'error' }); return; }
-        if (!pd.categoryId) { addToast({ message: 'Catégorie requise.', type: 'error' }); return; }
+        if (!pd.categoryId) { addToast({ message: 'CatÃ©gorie requise.', type: 'error' }); return; }
         if (pd.lowStockThreshold !== undefined && (!Number.isFinite(Number(pd.lowStockThreshold)) || Number(pd.lowStockThreshold) < 0)) { addToast({ message: 'Seuil low stock invalide.', type: 'error' }); return; }
 
         if (pd.type === ProductType.STANDARD) {
@@ -483,12 +476,12 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             if (bundleComps.length === 0) { addToast({ message: 'Ajoutez au moins un composant au bundle.', type: 'error' }); return; }
             for (const c of bundleComps) {
                 if (!Number.isFinite(Number(c.quantity)) || Number(c.quantity) <= 0 || Math.floor(Number(c.quantity)) !== Number(c.quantity)) {
-                    addToast({ message: 'Quantité composant invalide (entier > 0).', type: 'error' }); return;
+                    addToast({ message: 'QuantitÃ© composant invalide (entier > 0).', type: 'error' }); return;
                 }
             }
         }
 
-        const confirmMsg = product ? 'Confirmer la mise à jour du produit ?' : 'Confirmer la création du produit ?';
+        const confirmMsg = product ? 'Confirmer la mise Ã  jour du produit ?' : 'Confirmer la crÃ©ation du produit ?';
         if (!window.confirm(confirmMsg)) return;
         
         if (product) {
@@ -500,7 +493,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             } else {
                 await apiUpdateProduct(product.id, (productData.type === ProductType.BUNDLE ? { ...productData, bundleComponents: bundleComps } : productData) as any, user.id);
             }
-            addToast({ message: 'Produit mis à jour.', type: 'success' });
+            addToast({ message: 'Produit mis Ã  jour.', type: 'success' });
         } else {
             if (USE_API) {
                 const created: any = await apiProducts.createProduct(productData);
@@ -510,7 +503,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, product, c
             } else {
                 await apiCreateProduct((productData.type === ProductType.BUNDLE ? { ...productData, bundleComponents: bundleComps } : productData) as any, user.id);
             }
-            addToast({ message: 'Produit créé.', type: 'success' });
+            addToast({ message: 'Produit crÃ©Ã©.', type: 'success' });
         }
         onSave();
         onClose();
@@ -625,7 +618,7 @@ const StockTransferModal: React.FC<{
                 }
                 if (p.id === s.variationId) { label = `${p.name}${p.sku ? ' [' + p.sku + ']' : ''}`; break; }
             }
-            opts.push({ value: s.variationId, label: `${label} — dispo: ${s.quantity}`, available: s.quantity });
+            opts.push({ value: s.variationId, label: `${label} - dispo: ${s.quantity}`, available: s.quantity });
         });
         const seen = new Set<string>();
         return opts.filter(o => (seen.has(o.value) ? false : (seen.add(o.value), true)));
@@ -696,11 +689,6 @@ const StockTransferModal: React.FC<{
         </Modal>
     );
 };
-
-
-
-
-
 
 
 

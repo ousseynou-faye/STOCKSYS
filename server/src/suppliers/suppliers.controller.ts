@@ -23,6 +23,11 @@ export class SuppliersController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateSupplierDto) { return this.service.update(id, body); }
 
+  @RequirePermissions('MANAGE_SUPPLIERS')
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param('id') id: string) { return this.service.remove(id); }
+
   @RequirePermissions('VIEW_SUPPLIERS')
   @Get(':id/products')
   products(@Param('id') id: string, @Query() q: any) { return this.service.products(id, q); }

@@ -95,4 +95,19 @@ export class SuppliersService {
     await this.prisma.supplierProduct.delete({ where: { supplierId_variationId: { supplierId, variationId } } });
     return { success: true };
   }
+
+  async remove(id: string): Promise<void> {
+    const supplier = await this.prisma.supplier.findUnique({ where: { id } });
+    if (!supplier) throw new NotFoundException(FR.ERR_SUPPLIER_NOT_FOUND);
+
+    const linkedOrders = await this.prisma.purchaseOrder.count({ where: { supplierId: id } });
+    if (linkedOrders > 0) {
+      throw new BadRequestException("Impossible de supprimer un fournisseur lie a des commandes d'achat.");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.supplierProduct.deleteMany({ where: { supplierId: id } });
+      await tx.supplier.delete({ where: { id } });
+    });
+  }
 }

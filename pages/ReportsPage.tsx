@@ -107,7 +107,7 @@ const ReportsPage: React.FC = () => {
                 setExpensesReport(er as any[]);
             } catch (e: any) {
                 if (e?.status === 403) {
-                    addToast({ message: 'AccÃ¨s refusÃ© â€” permission requise: VIEW_REPORTS', type: 'error' });
+                    addToast({ message: 'Accès refusé — permission requise: VIEW_REPORTS', type: 'error' });
                     setSalesReport(null);
                     setStockValuationReport(null);
                     setProfitabilityReport(null);
@@ -329,32 +329,32 @@ const ReportsPage: React.FC = () => {
             columns: [
                 { header: 'Produit', accessor: 'productName' },
                 { header: 'Boutique', accessor: 'storeName' },
-                { header: 'QuantitÃ©', accessor: 'quantity' },
-                { header: 'CoÃ»t Unitaire', accessor: (item: any) => formatCurrency(item.costPerUnit) },
+                { header: 'Quantité', accessor: 'quantity' },
+                { header: 'Coût Unitaire', accessor: (item: any) => formatCurrency(item.costPerUnit) },
                 { header: 'Valeur Totale', accessor: (item: any) => formatCurrency(item.totalValue) },
             ],
             exportFilename: 'valorisation_stock',
         },
         profitability: {
-            title: "Rapport de RentabilitÃ©",
+            title: "Rapport de Rentabilité",
             data: profitabilityReportData,
             columns: [
                 { header: 'Date', accessor: 'date' },
                 { header: 'Boutique', accessor: 'storeName' },
                 { header: 'Chiffre d\'Affaires', accessor: (item: any) => formatCurrency(item.revenue) },
-                { header: 'CoÃ»t des Ventes', accessor: (item: any) => formatCurrency(item.cost) },
-                { header: 'BÃ©nÃ©fice Brut', accessor: (item: any) => formatCurrency(item.profit) },
+                { header: 'Coût des Ventes', accessor: (item: any) => formatCurrency(item.cost) },
+                { header: 'Bénéfice Brut', accessor: (item: any) => formatCurrency(item.profit) },
                 { header: 'Marge Brute', accessor: (item: any) => `${item.margin.toFixed(2)}%` },
             ],
             exportFilename: 'rapport_rentabilite',
         },
         expenses: {
-            title: "Rapport des DÃ©penses",
+            title: "Rapport des Dépenses",
             data: expensesReportData,
             columns: [
                 { header: 'Date', accessor: 'date' },
                 { header: 'Boutique', accessor: 'storeName' },
-                { header: 'CatÃ©gorie', accessor: 'category' },
+                { header: 'Catégorie', accessor: 'category' },
                 { header: 'Description', accessor: 'description' },
                 { header: 'Montant', accessor: (item: any) => formatCurrency(item.amount) },
             ],
@@ -378,12 +378,12 @@ const ReportsPage: React.FC = () => {
                 };
             case 'profitability':
                 return {
-                    totalLabel: 'BÃ©nÃ©fice Brut Total',
+                    totalLabel: 'Bénéfice Brut Total',
                     totalAmount: profitabilityReportData.reduce((sum, item) => sum + item.profit, 0)
                 };
             case 'expenses':
                 return {
-                    totalLabel: 'DÃ©penses Totales',
+                    totalLabel: 'Dépenses Totales',
                     totalAmount: expensesReportData.reduce((sum, item) => sum + item.amount, 0)
                 };
             default:
@@ -413,14 +413,14 @@ const ReportsPage: React.FC = () => {
                 <nav className="-mb-px flex space-x-2 sm:space-x-4 overflow-x-auto">
                     <button className={tabClasses('sales')} onClick={() => setActiveTab('sales')}>Ventes</button>
                     <button className={tabClasses('stock')} onClick={() => setActiveTab('stock')}>Stock</button>
-                    <button className={tabClasses('profitability')} onClick={() => setActiveTab('profitability')}>RentabilitÃ©</button>
-                    <button className={tabClasses('expenses')} onClick={() => setActiveTab('expenses')}>DÃ©penses</button>
+                    <button className={tabClasses('profitability')} onClick={() => setActiveTab('profitability')}>Rentabilité</button>
+                    <button className={tabClasses('expenses')} onClick={() => setActiveTab('expenses')}>Dépenses</button>
                 </nav>
             </div>
 
             <Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-end">
-                    <Input label="Date de dÃ©but" id="startDate" name="startDate" type="date" value={filters.startDate} onChange={handleFilterChange} />
+                    <Input label="Date de début" id="startDate" name="startDate" type="date" value={filters.startDate} onChange={handleFilterChange} />
                     <Input label="Date de fin" id="endDate" name="endDate" type="date" value={filters.endDate} onChange={handleFilterChange} />
                     <Select label="Boutique" id="storeId" name="storeId" value={filters.storeId} onChange={handleFilterChange} options={[{ value: '', label: 'Toutes' }, ...((USE_API ? stores : MOCK_STORES) as any[]).map((s: any) => ({ value: s.id, label: s.name }))]} disabled={!!user?.storeId && !hasPermission(Permission.MANAGE_ROLES)} />
                     
@@ -428,15 +428,15 @@ const ReportsPage: React.FC = () => {
                         <>
                             <Select label="Vendeur" id="userId" name="userId" value={filters.userId} onChange={handleFilterChange} options={[{ value: '', label: 'Tous' }, ...((USE_API ? users : MOCK_USERS) as any[]).map((u: any) => ({ value: u.id, label: (u.username || u.email || u.name) }))]} />
                             <Select label="Produit" id="productId" name="productId" value={filters.productId} onChange={handleFilterChange} options={[{ value: '', label: 'Tous' }, ...((USE_API ? products : MOCK_PRODUCTS) as any[]).map((p: any) => ({ value: p.id, label: p.name }))]} />
-                            <Select label="CatÃ©gorie" id="categoryId" name="categoryId" value={filters.categoryId} onChange={handleFilterChange} options={[{ value: '', label: 'Toutes' }, ...((USE_API ? categories : MOCK_CATEGORIES) as any[]).map((c: any) => ({ value: c.id, label: c.name }))]} />
+                            <Select label="Catégorie" id="categoryId" name="categoryId" value={filters.categoryId} onChange={handleFilterChange} options={[{ value: '', label: 'Toutes' }, ...((USE_API ? categories : MOCK_CATEGORIES) as any[]).map((c: any) => ({ value: c.id, label: c.name }))]} />
                         </>
                     )}
                     {activeTab === 'expenses' && (
-                         <Select label="CatÃ©gorie DÃ©pense" id="expenseCategory" name="expenseCategory" value={filters.expenseCategory} onChange={handleFilterChange} options={[{ value: '', label: 'Toutes' }, ...Object.values(ExpenseCategory).map(c => ({ value: c, label: c }))]} />
+                         <Select label="Catégorie Dépense" id="expenseCategory" name="expenseCategory" value={filters.expenseCategory} onChange={handleFilterChange} options={[{ value: '', label: 'Toutes' }, ...Object.values(ExpenseCategory).map(c => ({ value: c, label: c }))]} />
                     )}
 
                     <div className="col-start-auto">
-                        <Button variant="secondary" onClick={resetFilters} className="w-full">RÃ©initialiser</Button>
+                        <Button variant="secondary" onClick={resetFilters} className="w-full">Réinitialiser</Button>
                     </div>
                 </div>
             </Card>

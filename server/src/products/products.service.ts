@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { FR } from '../common/i18n/fr.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -26,29 +27,46 @@ export class ProductsService {
     return { data, meta: { page, limit, total } };
   }
   async create(data: any) {
-    if (data?.type === 'STANDARD') {
-      const sku = data?.sku || `SKU-${Date.now()}`;
-      const price = Number(data?.price ?? 0);
-      // Create product and ensure a default variation exists for sales/stock flows
-      return this.prisma.product.create({
-        data: {
-          name: data.name,
-          type: 'STANDARD',
-          lowStockThreshold: Number(data.lowStockThreshold ?? 0),
-          categoryId: data.categoryId,
-          sku,
-          price,
-          variations: { create: [{ sku, price, attributes: {} }] },
-        },
-        include: { variations: true, bundleComponents: true },
-      });
+    try {
+      if (data?.type === 'STANDARD') {
+        const sku = data?.sku || `SKU-${Date.now()}`;
+        const price = Number(data?.price ?? 0);
+        // Create product and ensure a default variation exists for sales/stock flows
+        return await this.prisma.product.create({
+          data: {
+            name: data.name,
+            type: 'STANDARD',
+            lowStockThreshold: Number(data.lowStockThreshold ?? 0),
+            categoryId: data.categoryId,
+            sku,
+            price,
+            variations: { create: [{ sku, price, attributes: {} }] },
+          },
+          include: { variations: true, bundleComponents: true },
+        });
+      }
+      return await this.prisma.product.create({ data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') throw new BadRequestException('SKU deja utilise.');
+        if (error.code === 'P2003') throw new BadRequestException('Categorie ou reference invalide.');
+      }
+      throw error;
     }
-    return this.prisma.product.create({ data });
   }
   async update(id: string, data: any) {
     const exists = await this.prisma.product.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(FR.ERR_PRODUCT_NOT_FOUND);
-    const updated = await this.prisma.product.update({ where: { id }, data });
+    let updated;
+    try {
+      updated = await this.prisma.product.update({ where: { id }, data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') throw new BadRequestException('SKU deja utilise.');
+        if (error.code === 'P2003') throw new BadRequestException('Categorie ou reference invalide.');
+      }
+      throw error;
+    }
     // Keep default variation in sync for STANDARD products
     if ((updated as any).type === 'STANDARD') {
       const sku = data?.sku;

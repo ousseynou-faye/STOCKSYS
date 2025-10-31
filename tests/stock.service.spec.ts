@@ -1,5 +1,14 @@
-import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@nestjs/common', async () => {
+  const actual = await vi.importActual<typeof import('@nestjs/common')>('@nestjs/common');
+  return {
+    ...actual,
+    Injectable: () => () => {},
+  };
+});
+
+import { BadRequestException } from '@nestjs/common';
 import { StockService } from '../server/src/stock/stock.service.js';
 
 const createService = () => {
