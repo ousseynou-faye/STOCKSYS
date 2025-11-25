@@ -26,6 +26,13 @@ export const useToast = () => {
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
+<<<<<<< HEAD
+=======
+    const removeToast = useCallback((id: number) => {
+        setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
+    }, []);
+
+>>>>>>> 7884868 (STOCKSYS)
     const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
         const id = Date.now();
         setToasts(prevToasts => [...prevToasts, { ...toast, id }]);
@@ -33,16 +40,25 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setTimeout(() => {
             removeToast(id);
         }, 5000); // Auto-dismiss after 5 seconds
+<<<<<<< HEAD
     }, []);
     
     const removeToast = useCallback((id: number) => {
         setToasts(prevToasts => prevToasts.filter(toast => toast.id !== id));
     }, []);
 
+=======
+    }, [removeToast]);
+    
+>>>>>>> 7884868 (STOCKSYS)
     return (
         <ToastContext.Provider value={{ addToast }}>
             {children}
             <ToastContainer toasts={toasts} onDismiss={removeToast} />
         </ToastContext.Provider>
     );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 7884868 (STOCKSYS)

@@ -28,7 +28,21 @@ const createService = () => {
     audit: vi.fn().mockResolvedValue(undefined),
   };
 
+<<<<<<< HEAD
   return { prismaStub, auditStub, service: new StockService(prismaStub as any, auditStub as any) };
+=======
+  const scopeLoggerStub = {
+    logViolation: vi.fn(),
+    logOverride: vi.fn(),
+  };
+
+  return {
+    prismaStub,
+    auditStub,
+    scopeLoggerStub,
+    service: new StockService(prismaStub as any, auditStub as any, scopeLoggerStub as any),
+  };
+>>>>>>> 7884868 (STOCKSYS)
 };
 
 describe('StockService.adjust', () => {
@@ -89,7 +103,12 @@ describe('StockService.transfer', () => {
       ),
     };
 
+<<<<<<< HEAD
     const service = new StockService(prisma as any, auditStub as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new StockService(prisma as any, auditStub as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await expect(
       service.transfer(
@@ -130,7 +149,12 @@ describe('StockService.transfer', () => {
       ),
     };
 
+<<<<<<< HEAD
     const service = new StockService(prisma as any, auditStub as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new StockService(prisma as any, auditStub as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await service.transfer(
       {
@@ -192,7 +216,12 @@ describe('StockService.transfer', () => {
       ),
     };
 
+<<<<<<< HEAD
     const service = new StockService(prisma as any, auditStub as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new StockService(prisma as any, auditStub as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await service.transfer(
       {
@@ -255,7 +284,12 @@ describe('StockService.transfer', () => {
       ),
     };
 
+<<<<<<< HEAD
     const service = new StockService(prisma as any, auditStub as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new StockService(prisma as any, auditStub as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await expect(
       service.transfer(
@@ -275,5 +309,8 @@ describe('StockService.transfer', () => {
     expect(productStockCreate).not.toHaveBeenCalled();
   });
 });
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 7884868 (STOCKSYS)

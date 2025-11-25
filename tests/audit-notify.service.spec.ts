@@ -103,3 +103,64 @@ describe('AuditNotifyService.notifyLowStock', () => {
     expect(prisma.notification.update).not.toHaveBeenCalled();
   });
 });
+<<<<<<< HEAD
+=======
+
+describe('AuditNotifyService.notifyMultiChannel', () => {
+  const service = new AuditNotifyService();
+
+  it('envoie sur plusieurs canaux (db + email + sms) et retourne les canaux réussis', async () => {
+    const prisma = {
+      notification: {
+        create: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+    const emailAdapter = vi.fn().mockResolvedValue(undefined);
+    const smsAdapter = vi.fn().mockResolvedValue(undefined);
+
+    const result = await service.notifyMultiChannel(prisma, {
+      type: 'ALERT',
+      message: 'Test multi-canal',
+      storeId: 'store-1',
+      channels: ['db', 'email', 'sms'],
+      adapters: { email: emailAdapter, sms: smsAdapter },
+    });
+
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    expect(emailAdapter).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'ALERT', message: 'Test multi-canal', storeId: 'store-1' }),
+    );
+    expect(smsAdapter).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'ALERT', message: 'Test multi-canal', storeId: 'store-1' }),
+    );
+    expect(result).toEqual({
+      db: true,
+      email: true,
+      sms: true,
+      webhook: false,
+    });
+  });
+
+  it("n'echoue pas si un canal est demande sans adapter disponible", async () => {
+    const prisma = {
+      notification: {
+        create: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    const result = await service.notifyMultiChannel(prisma, {
+      type: 'INFO',
+      message: 'Sans adapter',
+      channels: ['db', 'email'], // email sans adapter
+    });
+
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      db: true,
+      email: false,
+      sms: false,
+      webhook: false,
+    });
+  });
+});
+>>>>>>> 7884868 (STOCKSYS)

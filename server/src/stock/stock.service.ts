@@ -2,6 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { hasGlobalAccess, getUserStoreId } from '../common/utils/auth.utils.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditNotifyService } from '../common/services/audit-notify.service.js';
+<<<<<<< HEAD
+=======
+import { ScopeLoggerService } from '../common/services/scope-logger.service.js';
+>>>>>>> 7884868 (STOCKSYS)
 
 type ListQuery = {
   page?: string;
@@ -13,7 +17,15 @@ type ListQuery = {
 
 @Injectable()
 export class StockService {
+<<<<<<< HEAD
   constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
+=======
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditNotifyService,
+    private scopeLogger: ScopeLoggerService,
+  ) {}
+>>>>>>> 7884868 (STOCKSYS)
 
   async list(q?: ListQuery, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
@@ -38,6 +50,20 @@ export class StockService {
     if (isAdmin) {
       if (requestedStoreId) where.storeId = requestedStoreId;
     } else if (userStoreId) {
+<<<<<<< HEAD
+=======
+      if (requestedStoreId && requestedStoreId !== userStoreId) {
+        this.scopeLogger.logViolation({
+          domain: 'stock',
+          userId: user?.sub,
+          username: user?.username,
+          requestedStoreId,
+          enforcedStoreId: userStoreId,
+          reason: 'store_override_list',
+          traceId: (user as any)?.traceId,
+        });
+      }
+>>>>>>> 7884868 (STOCKSYS)
       where.storeId = userStoreId;
     } else if (requestedStoreId) {
       where.storeId = requestedStoreId;
@@ -60,6 +86,18 @@ export class StockService {
 
     if (!targetStoreId) throw new BadRequestException('Boutique introuvable pour cet ajustement.');
     if (!isAdmin && body.storeId && body.storeId !== targetStoreId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'stock',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId: body.storeId,
+        enforcedStoreId: targetStoreId,
+        reason: 'adjust_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Ajustement limite a votre boutique.');
     }
 
@@ -106,6 +144,18 @@ export class StockService {
 
     if (!fromStoreId) throw new BadRequestException('Boutique source introuvable pour le transfert.');
     if (!isAdmin && body.fromStoreId && body.fromStoreId !== fromStoreId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'stock',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId: body.fromStoreId,
+        enforcedStoreId: fromStoreId,
+        reason: 'transfer_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Transfert limite depuis votre boutique.');
     }
 

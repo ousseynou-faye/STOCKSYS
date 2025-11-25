@@ -44,11 +44,19 @@ describe('PurchasesService.receive', () => {
     ),
   });
 
+<<<<<<< HEAD
   let consoleSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
+=======
+let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+    consoleSpy = vi.spyOn(console as any, 'error').mockImplementation(() => {});
+});
+>>>>>>> 7884868 (STOCKSYS)
 
   afterEach(() => {
     consoleSpy.mockRestore();
@@ -56,7 +64,12 @@ describe('PurchasesService.receive', () => {
 
   it('rejette lorsque la quantite recu depasse le commande', async () => {
     const prisma = createPrismaStub();
+<<<<<<< HEAD
     const service = new PurchasesService(prisma as any, createAuditStub() as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new PurchasesService(prisma as any, createAuditStub() as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await expect(
       service.receive(
@@ -99,7 +112,12 @@ describe('PurchasesService.receive', () => {
       ),
     };
 
+<<<<<<< HEAD
     const service = new PurchasesService(prisma as any, createAuditStub() as any);
+=======
+    const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+    const service = new PurchasesService(prisma as any, createAuditStub() as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
 
     await service.receive(
       purchaseOrder.id,

@@ -21,6 +21,7 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
+<<<<<<< HEAD
       "@/*": [
         "./*"
       ]
@@ -28,4 +29,17 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   }
+=======
+      "@/*": ["./*"],
+      "@nestjs/common": ["./tests/stubs/nestjs-common"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "server/**/*"
+  ]
+>>>>>>> 7884868 (STOCKSYS)
 }

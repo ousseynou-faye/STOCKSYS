@@ -3,10 +3,22 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditNotifyService } from '../common/services/audit-notify.service.js';
 import { hasGlobalAccess } from '../common/utils/auth.utils.js';
+<<<<<<< HEAD
 
 @Injectable()
 export class PurchasesService {
   constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
+=======
+import { ScopeLoggerService } from '../common/services/scope-logger.service.js';
+
+@Injectable()
+export class PurchasesService {
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditNotifyService,
+    private scopeLogger: ScopeLoggerService,
+  ) {}
+>>>>>>> 7884868 (STOCKSYS)
 
   async list(q?: any, user?: any) {
     const page = Math.max(parseInt(q?.page ?? '1', 10) || 1, 1);
@@ -21,6 +33,20 @@ export class PurchasesService {
     if (isAdmin) {
       if (q?.storeId) where.storeId = q.storeId;
     } else if (user?.storeId) {
+<<<<<<< HEAD
+=======
+      if (q?.storeId && q.storeId !== user.storeId) {
+        this.scopeLogger.logViolation({
+          domain: 'purchases',
+          userId: user?.sub,
+          username: user?.username,
+          requestedStoreId: q.storeId,
+          enforcedStoreId: user.storeId,
+          reason: 'list_store_override',
+          traceId: (user as any)?.traceId,
+        });
+      }
+>>>>>>> 7884868 (STOCKSYS)
       where.storeId = user.storeId;
     } else if (q?.storeId) {
       where.storeId = q.storeId;
@@ -42,6 +68,18 @@ export class PurchasesService {
       throw new BadRequestException('Boutique introuvable pour la commande.');
     }
     if (!isAdmin && po.storeId && po.storeId !== storeId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'purchases',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId: po.storeId,
+        enforcedStoreId: storeId,
+        reason: 'create_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Vous ne pouvez creer des commandes que pour votre boutique.');
     }
 
@@ -92,6 +130,18 @@ export class PurchasesService {
     if (!current) throw new BadRequestException('Commande introuvable');
     const isAdmin = hasGlobalAccess(user);
     if (!isAdmin && user?.storeId && current.storeId !== user.storeId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'purchases',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId: current.storeId,
+        enforcedStoreId: user.storeId,
+        reason: 'update_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Vous ne pouvez modifier que les commandes de votre boutique.');
     }
 
@@ -118,11 +168,32 @@ export class PurchasesService {
       throw new BadRequestException(`Transition ${current.status} -> ${po.status} interdite`);
     }
 
+<<<<<<< HEAD
     const { items, totalAmount, createdAt, receivedAt, createdById, ...rest } = po || {};
+=======
+    const rest = { ...(po || {}) };
+    delete (rest as any).items;
+    delete (rest as any).totalAmount;
+    delete (rest as any).createdAt;
+    delete (rest as any).receivedAt;
+    delete (rest as any).createdById;
+>>>>>>> 7884868 (STOCKSYS)
     const data: any = {};
     if (rest.supplierId !== undefined) data.supplierId = rest.supplierId;
     if (rest.storeId !== undefined) {
       if (!isAdmin && user?.storeId && rest.storeId !== user.storeId) {
+<<<<<<< HEAD
+=======
+        this.scopeLogger.logViolation({
+          domain: 'purchases',
+          userId: user?.sub,
+          username: user?.username,
+          requestedStoreId: rest.storeId,
+          enforcedStoreId: user.storeId,
+          reason: 'update_store_mismatch',
+          traceId: (user as any)?.traceId,
+        });
+>>>>>>> 7884868 (STOCKSYS)
         throw new BadRequestException('Changement de boutique non autorise.');
       }
       data.storeId = rest.storeId;
@@ -146,6 +217,18 @@ export class PurchasesService {
         if (!po) throw new BadRequestException('Commande introuvable');
         const isAdmin = hasGlobalAccess(user);
         if (!isAdmin && user?.storeId && po.storeId !== user.storeId) {
+<<<<<<< HEAD
+=======
+          this.scopeLogger.logViolation({
+            domain: 'purchases',
+            userId: user?.sub,
+            username: user?.username,
+            requestedStoreId: po.storeId,
+            enforcedStoreId: user.storeId,
+            reason: 'receive_store_mismatch',
+            traceId: (user as any)?.traceId,
+          });
+>>>>>>> 7884868 (STOCKSYS)
           throw new BadRequestException('Reception limitee a votre boutique.');
         }
         if (po.status === 'CANCELLED' || po.status === 'RECEIVED') {

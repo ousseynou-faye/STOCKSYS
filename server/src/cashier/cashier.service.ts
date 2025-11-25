@@ -47,8 +47,12 @@ export class CashierService {
       include: { sale: { select: { id: true } } },
     });
 
+<<<<<<< HEAD
     const methods = ['CASH', 'CARD', 'MOBILE_MONEY'] as const;
     const totals: Record<typeof methods[number], number> = { CASH: 0, CARD: 0, MOBILE_MONEY: 0 } as any;
+=======
+    const totals: Record<'CASH' | 'CARD' | 'MOBILE_MONEY', number> = { CASH: 0, CARD: 0, MOBILE_MONEY: 0 };
+>>>>>>> 7884868 (STOCKSYS)
     for (const p of payments) {
       const key = p.method as keyof typeof totals;
       if (totals[key] !== undefined) totals[key] += p.amount;
@@ -77,8 +81,12 @@ export class CashierService {
       include: { sale: { select: { id: true, totalAmount: true, createdAt: true } } },
     });
 
+<<<<<<< HEAD
     const methods = ['CASH', 'CARD', 'MOBILE_MONEY'] as const;
     const totals: Record<typeof methods[number], number> = { CASH: 0, CARD: 0, MOBILE_MONEY: 0 } as any;
+=======
+    const totals: Record<'CASH' | 'CARD' | 'MOBILE_MONEY', number> = { CASH: 0, CARD: 0, MOBILE_MONEY: 0 };
+>>>>>>> 7884868 (STOCKSYS)
     const saleSeen = new Set<string>();
     let saleCount = 0;
     let totalSalesAmount = 0;

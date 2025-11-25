@@ -18,8 +18,14 @@ for (const t of targets) {
   const p = resolve(outDir, t.name);
   if (!existsSync(p)) {
     writeFileSync(p, Buffer.from(t.data, 'base64'));
+<<<<<<< HEAD
     // eslint-disable-next-line no-console
     console.log(`Generated ${t.name}`);
   }
 }
 
+=======
+    console.log(`Generated ${t.name}`);
+  }
+}
+>>>>>>> 7884868 (STOCKSYS)

@@ -232,6 +232,10 @@ const SaleModal: React.FC<SaleModalProps> = ({ isOpen, onClose }) => {
 // SalesPage main component
 const SalesPage: React.FC = () => {
     const { user, hasPermission } = useAuth();
+<<<<<<< HEAD
+=======
+    const { addToast } = useToast();
+>>>>>>> 7884868 (STOCKSYS)
     const { isOnline, triggerSync, setPendingSaleCount } = useOnlineStatus();
     const [sales, setSales] = useState<Sale[]>([]);
     const [pendingSales, setPendingSales] = useState<Sale[]>([]);

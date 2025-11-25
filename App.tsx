@@ -1,7 +1,10 @@
+<<<<<<< HEAD
 
 
 
 
+=======
+>>>>>>> 7884868 (STOCKSYS)
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -37,6 +40,10 @@ import CashierClosingPage from './pages/CashierClosingPage';
 import { useToast } from './contexts/ToastContext';
 import { buildPermissionDeniedMessage, pathToRequiredPermission } from './utils/permissionLabels';
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7884868 (STOCKSYS)
 // Component to protect the entire application layout
 const LayoutProtectedRoute: React.FC = () => {
     const { isAuthenticated } = useAuth();
@@ -107,12 +114,21 @@ const AppRoutes: React.FC = () => {
                      <Route path="/profile" element={<ProfilePage />} />
                      
                      <Route element={<PermissionProtectedRoute permission={Permission.VIEW_SALES_HISTORY} />}>
+<<<<<<< HEAD
                          <Route path="/sales" element={<SalesPage />} />
                      </Route>
 
                      <Route element={<PermissionProtectedRoute permission={Permission.VIEW_STOCK} />}>
                          <Route path="/stock" element={<StockPage />} />
                          <Route path="/products" element={<ProductsPage />} />
+=======
+                        <Route path="/sales" element={<SalesPage />} />
+                     </Route>
+
+                     <Route element={<PermissionProtectedRoute permission={Permission.VIEW_STOCK} />}>
+                        <Route path="/stock" element={<StockPage />} />
+                        <Route path="/products" element={<ProductsPage />} />
+>>>>>>> 7884868 (STOCKSYS)
                      </Route>
                     
                      <Route element={<PermissionProtectedRoute permission={Permission.VIEW_USERS} />}>

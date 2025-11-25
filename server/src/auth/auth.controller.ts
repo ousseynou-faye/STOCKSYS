@@ -1,4 +1,8 @@
 import { Body, Controller, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
+<<<<<<< HEAD
+=======
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+>>>>>>> 7884868 (STOCKSYS)
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -11,6 +15,11 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+<<<<<<< HEAD
+=======
+  @UseGuards(ThrottlerGuard)
+  @Throttle(5, 60) // 5 attempts per 60s per IP
+>>>>>>> 7884868 (STOCKSYS)
   @ApiBody({
     schema: {
       type: 'object',

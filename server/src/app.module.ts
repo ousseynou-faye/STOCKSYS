@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import { Module } from '@nestjs/common';
+=======
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
+>>>>>>> 7884868 (STOCKSYS)
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { CommonModule } from './common/common.module.js';
@@ -20,11 +25,22 @@ import { AuditModule } from './audit/audit.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { SearchModule } from './search/search.module.js';
 import { ReportsModule } from './reports/reports.module.js';
+<<<<<<< HEAD
+=======
+import { RequestContextMiddleware } from './common/middleware/request-context.middleware.js';
+>>>>>>> 7884868 (STOCKSYS)
 
 @Module({
   imports: [
     // Load env from server/.env and also fall back to ../prisma/.env or ../.env when running from monorepo root
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../prisma/.env', '../.env'] }),
+<<<<<<< HEAD
+=======
+    ThrottlerModule.forRoot({
+      ttl: 60,
+      limit: 10,
+    }),
+>>>>>>> 7884868 (STOCKSYS)
     PrismaModule,
     CommonModule,
     AuthModule,
@@ -47,4 +63,12 @@ import { ReportsModule } from './reports/reports.module.js';
     ReportsModule,
   ],
 })
+<<<<<<< HEAD
 export class AppModule {}
+=======
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes('*');
+  }
+}
+>>>>>>> 7884868 (STOCKSYS)

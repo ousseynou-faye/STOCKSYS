@@ -1,7 +1,16 @@
+<<<<<<< HEAD
 export const USE_API = (import.meta as any).env?.VITE_USE_API === 'true';
 export const STRICT_API = USE_API && ((import.meta as any).env?.VITE_STRICT_API === 'true');
 
 const baseURL = '/api';
+=======
+const env = (import.meta as any).env || {};
+export const USE_API = env.VITE_USE_API === 'true';
+export const STRICT_API = USE_API && env.VITE_STRICT_API === 'true';
+
+// Allow overriding the API base URL when front & back are hosted separately
+const baseURL = env.VITE_API_BASE || '/api';
+>>>>>>> 7884868 (STOCKSYS)
 
 export type ApiErrorDetail = { status: number; path: string; message: string };
 

@@ -1,0 +1,31 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "timeout": 60000,
+    "wait": 1200,
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox", "--disable-dev-shm-usage"]
+    }
+  },
+  "urls": [
+    {
+      "url": "http://127.0.0.1:4173/#/login",
+      "actions": [
+        "set field #username admin",
+        "set field #password password123",
+        "click button[type=\"submit\"]",
+        "wait for element .card",           // tableau de bord visible
+        "run window.location.hash = '#/'",
+        "wait for element .card",
+        "run window.location.hash = '#/sales'",
+        "wait for element table",
+        "run window.location.hash = '#/purchases'",
+        "wait for element table",
+        "run window.location.hash = '#/stock'",
+        "wait for element table",
+        "run window.location.hash = '#/reports'",
+        "wait for element"
+      ]
+    }
+  ]
+}

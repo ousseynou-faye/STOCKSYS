@@ -52,7 +52,11 @@ export class UsersService {
     const exists = await this.prisma.user.findUnique({ where: { id } });
     if (!exists) throw new NotFoundException(FR.ERR_USER_NOT_FOUND);
     const { roleIds, ...rest } = data;
+<<<<<<< HEAD
     const updated = await this.prisma.user.update({ where: { id }, data: rest });
+=======
+    await this.prisma.user.update({ where: { id }, data: rest });
+>>>>>>> 7884868 (STOCKSYS)
     if (Array.isArray(roleIds)) {
       await this.prisma.user.update({ where: { id }, data: { roles: { set: [], connect: roleIds.map((rid: string) => ({ id: rid })) } } });
     }

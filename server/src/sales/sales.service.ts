@@ -3,6 +3,10 @@ import { FR } from '../common/i18n/fr.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditNotifyService } from '../common/services/audit-notify.service.js';
 import { hasGlobalAccess, getUserStoreId } from '../common/utils/auth.utils.js';
+<<<<<<< HEAD
+=======
+import { ScopeLoggerService } from '../common/services/scope-logger.service.js';
+>>>>>>> 7884868 (STOCKSYS)
 
 type SalesListQuery = {
   page?: string;
@@ -16,7 +20,15 @@ type SalesListQuery = {
 
 @Injectable()
 export class SalesService {
+<<<<<<< HEAD
   constructor(private prisma: PrismaService, private audit: AuditNotifyService) {}
+=======
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditNotifyService,
+    private scopeLogger: ScopeLoggerService,
+  ) {}
+>>>>>>> 7884868 (STOCKSYS)
 
   private sanitizeAttributes(raw: any): Record<string, any> | null {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -45,6 +57,20 @@ export class SalesService {
     if (isAdmin) {
       if (requestedStoreId) where.storeId = requestedStoreId;
     } else if (userStoreId) {
+<<<<<<< HEAD
+=======
+      if (requestedStoreId && requestedStoreId !== userStoreId) {
+        this.scopeLogger.logViolation({
+          domain: 'sales',
+          userId: user?.sub,
+          username: user?.username,
+          requestedStoreId,
+          enforcedStoreId: userStoreId,
+          reason: 'list_store_override',
+          traceId: (user as any)?.traceId,
+        });
+      }
+>>>>>>> 7884868 (STOCKSYS)
       where.storeId = userStoreId;
     } else if (requestedStoreId) {
       where.storeId = requestedStoreId;
@@ -82,6 +108,18 @@ export class SalesService {
       throw new BadRequestException('Boutique requise pour enregistrer la vente.');
     }
     if (!isAdmin && requestedStoreId && requestedStoreId !== targetStoreId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'sales',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId,
+        enforcedStoreId: targetStoreId,
+        reason: 'create_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Vous ne pouvez creer des ventes que dans votre boutique.');
     }
 
@@ -262,6 +300,18 @@ export class SalesService {
     const isAdmin = hasGlobalAccess(user);
     const userStoreId = getUserStoreId(user);
     if (!isAdmin && sale.storeId && userStoreId && sale.storeId !== userStoreId) {
+<<<<<<< HEAD
+=======
+      this.scopeLogger.logViolation({
+        domain: 'sales',
+        userId: user?.sub,
+        username: user?.username,
+        requestedStoreId: sale.storeId,
+        enforcedStoreId: userStoreId,
+        reason: 'return_store_mismatch',
+        traceId: (user as any)?.traceId,
+      });
+>>>>>>> 7884868 (STOCKSYS)
       throw new BadRequestException('Retour limite a votre boutique.');
     }
 

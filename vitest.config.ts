@@ -13,6 +13,10 @@ export default defineConfig({
     include: ['tests/**/*.spec.ts'],
     reporters: ['default'],
     coverage: {
+<<<<<<< HEAD
+=======
+      provider: 'v8',
+>>>>>>> 7884868 (STOCKSYS)
       reporter: ['text', 'html'],
     },
   },

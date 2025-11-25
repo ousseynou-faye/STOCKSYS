@@ -1,6 +1,7 @@
 
 
 
+<<<<<<< HEAD
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -9,6 +10,16 @@ import { Button, Input } from './ui';
 import { 
     NotificationIcon, AlertIcon, SalesIcon, StockIcon, MenuIcon, 
     PurchaseOrderIcon, InventoryIcon, SupplierIcon, UserCircleIcon, CogIcon, LogoutIcon
+=======
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+import { useOnlineStatus } from '../contexts/OnlineStatusContext';
+import { Input } from './ui';
+import { 
+    NotificationIcon, AlertIcon, SalesIcon, StockIcon, MenuIcon, 
+    PurchaseOrderIcon, InventoryIcon, UserCircleIcon, CogIcon, LogoutIcon
+>>>>>>> 7884868 (STOCKSYS)
 } from './icons';
 // Fix: Add missing imports
 import { Notification, NotificationType, GlobalSearchResults } from '../types';
@@ -51,7 +62,11 @@ const GlobalSearch: React.FC = () => {
                     setResults(res);
                 }
                 setIsOpen(true);
+<<<<<<< HEAD
             } catch (e) {
+=======
+            } catch (_err) {
+>>>>>>> 7884868 (STOCKSYS)
                 // fallback mock on error
                 const res = await apiGlobalSearch(debouncedSearchTerm);
                 setResults(res);
@@ -225,7 +240,11 @@ const Header: React.FC<{notificationKey: number, onMenuClick: () => void}> = ({n
                 } else {
                     setNotifications(apiFetchNotifications());
                 }
+<<<<<<< HEAD
             } catch (e) {
+=======
+            } catch (_err) {
+>>>>>>> 7884868 (STOCKSYS)
                 setNotifications(apiFetchNotifications());
             }
         };

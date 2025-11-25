@@ -68,7 +68,12 @@ const createService = () => {
     notifyLowStock: vi.fn().mockResolvedValue(undefined),
   };
 
+<<<<<<< HEAD
   const service = new SalesService(prismaStub as any, auditStub as any);
+=======
+  const scopeLoggerStub = { logViolation: vi.fn(), logOverride: vi.fn() };
+  const service = new SalesService(prismaStub as any, auditStub as any, scopeLoggerStub as any);
+>>>>>>> 7884868 (STOCKSYS)
   return {
     service,
     prismaStub,

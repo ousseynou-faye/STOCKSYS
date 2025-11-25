@@ -142,4 +142,29 @@ describe('InventoryService', () => {
       new BadRequestException("La session d'inventaire doit être en statut 'REVIEW' avant confirmation"),
     );
   });
+<<<<<<< HEAD
+=======
+
+  it('bloque la confirmation si des articles restent non comptés après un comptage partiel', async () => {
+    const prisma = {
+      inventorySession: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'sess-4',
+          storeId: 'store-1',
+          status: 'REVIEW',
+          items: [
+            { variationId: 'var-1', countedQuantity: 5 },
+            { variationId: 'var-2', countedQuantity: -1 }, // non compté
+          ],
+        }),
+      },
+    };
+
+    const service = new InventoryService(prisma as any, createAuditStub() as any);
+
+    await expect(service.confirm('sess-4', { storeId: 'store-1', permissions: [] })).rejects.toThrow(
+      new BadRequestException('Des produits ne sont pas comptés. Finalisez le comptage avant confirmation.'),
+    );
+  });
+>>>>>>> 7884868 (STOCKSYS)
 });

@@ -3,6 +3,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+<<<<<<< HEAD
+=======
+import { useToast } from '../contexts/ToastContext';
+>>>>>>> 7884868 (STOCKSYS)
 import { Card, Button, Input, Select, Table, ExportDropdown } from '../components/ui';
 import { Sale, ProductStock, Store, Product, Category, Expense, Permission, ProductType } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -40,6 +44,10 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, description, icon, co
 
 const AdminManagerDashboard: React.FC = () => {
     const { user, hasPermission } = useAuth();
+<<<<<<< HEAD
+=======
+    const { addToast } = useToast();
+>>>>>>> 7884868 (STOCKSYS)
     const isManagerView = !hasPermission(Permission.MANAGE_ROLES); // Simple way to differentiate admin from manager
 
     const [filterStoreId, setFilterStoreId] = useState(isManagerView && user?.storeId ? user.storeId : '');
@@ -125,8 +133,12 @@ const AdminManagerDashboard: React.FC = () => {
             }
         };
         fetchData();
+<<<<<<< HEAD
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+=======
+    }, [addToast]);
+>>>>>>> 7884868 (STOCKSYS)
 
     const filteredData = useMemo(() => {
         const filterFn = <T extends { storeId: string; createdAt: string }>(item: T) => {

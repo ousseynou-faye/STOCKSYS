@@ -51,7 +51,11 @@ const Layout: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { hasPermission } = useAuth();
     
+<<<<<<< HEAD
     const [notificationKey, setNotificationKey] = useState(Date.now()); 
+=======
+    const [notificationKey] = useState(Date.now()); 
+>>>>>>> 7884868 (STOCKSYS)
 
     const navLinks = [
         { to: '/', label: 'Tableau de Bord', icon: DashboardIcon, permission: null }, // Always show for authenticated users
